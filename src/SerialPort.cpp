@@ -130,7 +130,7 @@ bool SerialPort::sendByte(unsigned char byte) {
 }
 
 bool SerialPort::readBytes(unsigned char* buffer, size_t size) {
-    int num_bytes = read(fd, buffer, size);
+    int num_bytes = read(fd, buffer, 1);
     if (num_bytes < 0) {
         printf("Error %i from open: %s\n", errno, strerror(errno));
         return false;

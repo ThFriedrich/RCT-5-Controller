@@ -2,6 +2,8 @@
 #include "SerialPort.h"
 #include <vector>
 #include <string>
+#include "imgui.h"
+#include "imgui_internal.h"
 
 static SerialPort *serialPort = nullptr;
 static char responseText[256] = "";
@@ -36,12 +38,23 @@ void render_window(SDL_Window *window, ImGuiIO &io)
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
                 done = true;
         }
-
+        
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
-
+        
+        ImGui::DockSpace(1319);
+        static auto first_time = true;
+        if (first_time)
+        {
+            first_time = false;
+            ImGui::DockBuilderRemoveNode(1319); // clear any previous layout
+            ImGui::DockBuilderAddNode(1319, ImGuiDockNodeFlags_DockSpace);
+            ImGui::DockBuilderDockWindow("CBED", 1319);
+            ImGui::DockBuilderFinish(1319);
+        }
+        
         // Create ImGui window
         ImGui::Begin("Serial Port Interface");
 
