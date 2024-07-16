@@ -2,6 +2,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <string>
+#include <algorithm>
 
 SerialPort::SerialPort(const std::string& portName, int baudRate)
     : handle(nullptr), portName(portName), baudRate(baudRate) {}
@@ -11,7 +13,7 @@ SerialPort::~SerialPort() {
 }
 
 bool SerialPort::open() {
-    handle = CreateFile(portName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    handle = CreateFileA(portName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (handle == INVALID_HANDLE_VALUE) {
         std::cerr << "Error opening serial port" << std::endl;
         return false;
@@ -26,9 +28,9 @@ bool SerialPort::open() {
     }
 
     dcbSerialParams.BaudRate = baudRate;
-    dcbSerialParams.ByteSize = 8;
-    dcbSerialParams.StopBits = ONESTOPBIT;
-    dcbSerialParams.Parity = NOPARITY;
+    // dcbSerialParams.ByteSize = 8;
+    // dcbSerialParams.StopBits = ONESTOPBIT;
+    // dcbSerialParams.Parity = NOPARITY;
 
     if (!SetCommState(handle, &dcbSerialParams)) {
         std::cerr << "Error setting serial port state" << std::endl;
@@ -46,13 +48,40 @@ void SerialPort::close() {
     }
 }
 
-bool SerialPort::sendByte(unsigned char byte) {
+bool SerialPort::sendCommand(const std::string& command) {
+    std::string upperCommand = command;
+    std::transform(upperCommand.begin(), upperCommand.end(), upperCommand.begin(), ::toupper);
+    upperCommand += " \r\n";
+    
     DWORD bytes_written;
-    if (!WriteFile(handle, &byte, 1, &bytes_written, NULL)) {
+    if (!WriteFile(handle, upperCommand.c_str(), upperCommand.size(), &bytes_written, NULL)) {
         std::cerr << "Error writing to serial port" << std::endl;
         return false;
     }
+    
     return true;
+}
+
+std::string SerialPort::readString() {
+    std::string result;
+    char buffer;
+    DWORD bytes_read;
+    
+    while (true) {
+        if (!ReadFile(handle, &buffer, 1, &bytes_read, NULL)) {
+            std::cerr << "Error reading from serial port" << std::endl;
+            return result;
+        }
+        if (bytes_read == 0) {
+            break;
+        }
+        if (buffer == '\n') {
+            break;
+        }
+        result += buffer;
+    }
+    
+    return result;
 }
 
 bool SerialPort::readBytes(unsigned char* buffer, size_t size) {
@@ -62,6 +91,31 @@ bool SerialPort::readBytes(unsigned char* buffer, size_t size) {
         return false;
     }
     return true;
+}
+
+std::vector<std::string> listSerialPorts()
+{
+    char lpTargetPath[5000]; // buffer to store the path of the COMPORTS
+    bool gotPort = false; // in case the port is not found
+
+    std::vector<std::string> ports;
+
+    for (int i = 0; i < 255; i++) // checking ports from COM0 to COM255
+    {
+        std::string str = "COM" + std::to_string(i); // converting to COM0, COM1, COM2
+        DWORD test = QueryDosDeviceA(str.c_str(), lpTargetPath, 5000);
+
+        // Test the return value and error if any
+        if (test  != 0) //QueryDosDevice returns zero if it didn't find an object
+        {
+            ports.push_back(str);
+            //std::cout << str << ": " << lpTargetPath << std::endl;
+        }
+        if (::GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+        {
+        }
+    }
+    return ports;
 }
 
 #else
@@ -156,3 +210,4 @@ std::vector<std::string> listSerialPorts() {
 }
 #endif
 #endif
+

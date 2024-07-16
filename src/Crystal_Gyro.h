@@ -9,4 +9,4 @@
 #include <SDL_opengl.h>
 #endif
 
-void render_window(SDL_Window *window,ImGuiIO &io);
+void render_window(SDL_Window *window,ImGuiIO &io, SDL_GLContext &gl_context);

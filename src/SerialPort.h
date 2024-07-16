@@ -13,7 +13,9 @@ public:
     bool open();
     void close();
     bool sendByte(unsigned char byte);
+    bool sendCommand(const std::string& command);
     bool readBytes(unsigned char* buffer, size_t size);
+    std::string readString();
     
 
 private:
