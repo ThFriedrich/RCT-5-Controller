@@ -65,9 +65,9 @@ if (WIN32)
     file(COPY ${SDL2_LIB_DIR}/SDL2_image.dll DESTINATION ${BUILD_DIR})
 endif (WIN32)
 
-add_executable(Crystal_Gyro src/main.cpp)
+add_executable(RCT_5_Control src/main.cpp)
 
-target_sources( Crystal_Gyro PRIVATE
+target_sources( RCT_5_Control PRIVATE
     imgui/misc/cpp/imgui_stdlib.cpp
     imgui/imgui_draw.cpp
     imgui/imgui_tables.cpp
@@ -77,26 +77,25 @@ target_sources( Crystal_Gyro PRIVATE
     imgui/imgui_demo.cpp
     imgui/imgui.cpp
     src/SerialPort.cpp
-    src/Crystal_Gyro.cpp
+    src/RCT_5_Control.cpp
     src/NamurCommands.cpp
     src/ImGuiINI.hpp
     )
 
-target_include_directories( Crystal_Gyro PUBLIC
+target_include_directories( RCT_5_Control PUBLIC
     imgui
     imgui/backends
     imgui/misc/cpp
     ${SDL2_INCLUDE_DIR}
     include
     src
-    src/cameras
     )
 
 find_package(OpenGL REQUIRED)
 
-target_link_libraries(Crystal_Gyro PUBLIC ${OPENGL_LIBRARIES})
+target_link_libraries(RCT_5_Control PUBLIC ${OPENGL_LIBRARIES})
 if (WIN32)
-    target_link_libraries(Crystal_Gyro PUBLIC SDL2main SDL2 SDL2_image ${CMAKE_DL_LIBS})
+    target_link_libraries(RCT_5_Control PUBLIC SDL2main SDL2 SDL2_image ${CMAKE_DL_LIBS})
 else ()
-    target_link_libraries(Crystal_Gyro PUBLIC SDL2main SDL2 SDL2_image ${CMAKE_DL_LIBS})
+    target_link_libraries(RCT_5_Control PUBLIC SDL2main SDL2 SDL2_image ${CMAKE_DL_LIBS})
 endif (WIN32)

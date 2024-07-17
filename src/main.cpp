@@ -17,7 +17,7 @@
 #else
 #include <SDL_opengl.h>
 #endif
-#include "Crystal_Gyro.h"
+#include "RCT_5_Control.h"
 #include "fonts.h"
 #include "GuiUtils.h"
 #include "imfilebrowser.h"

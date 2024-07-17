@@ -1,4 +1,4 @@
-#include "Crystal_Gyro.h"
+#include "RCT_5_Control.h"
 #include "SerialPort.h"
 #include <vector>
 #include <string>
@@ -136,7 +136,7 @@ void render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext &gl_context)
             }
             if (ImGui::BeginCombo("Commands", selectedCommandIndex >= 0 ? availableCommands[selectedCommandIndex].c_str() : "Select a command"))
             {
-                for (int i = 0; i < namur.size(); ++i)
+                for (size_t i = 0; i < namur.size(); ++i)
                 {
                     bool isSelected = (selectedCommandIndex == i);
                     if (ImGui::Selectable(availableCommands[i].c_str(), isSelected))

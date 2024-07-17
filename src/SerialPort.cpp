@@ -1,9 +1,9 @@
 #include "SerialPort.h"
+#include <algorithm>
 
 #ifdef _WIN32
 #include <windows.h>
 #include <string>
-#include <algorithm>
 
 SerialPort::SerialPort(const std::string& portName, int baudRate)
     : handle(nullptr), portName(portName), baudRate(baudRate) {}
@@ -192,6 +192,42 @@ bool SerialPort::readBytes(unsigned char* buffer, size_t size) {
     return true;
 }
 
+bool SerialPort::sendCommand(const std::string& command) {
+    std::string upperCommand = command;
+    std::transform(upperCommand.begin(), upperCommand.end(), upperCommand.begin(), ::toupper);
+    upperCommand += " \r\n";
+    
+    ssize_t bytes_written = write(fd, upperCommand.c_str(), upperCommand.size());
+    if (bytes_written < 0) {
+        std::cerr << "Error writing to serial port" << std::endl;
+        return false;
+    }
+    
+    return true;
+}
+
+std::string SerialPort::readString() {
+    std::string result;
+    char buffer;
+    ssize_t bytes_read;
+    
+    while (true) {
+        bytes_read = read(fd, &buffer, 1);
+        if (bytes_read < 0) {
+            std::cerr << "Error reading from serial port" << std::endl;
+            return result;
+        }
+        if (bytes_read == 0) {
+            break;
+        }
+        if (buffer == '\n') {
+            break;
+        }
+        result += buffer;
+    }
+    
+    return result;
+}
 #ifndef _WIN32
 #include <iostream>
 #include <vector>
