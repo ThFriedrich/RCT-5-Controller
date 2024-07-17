@@ -13,30 +13,40 @@ SerialPort::~SerialPort() {
 }
 
 bool SerialPort::open() {
+    DCB dcb;
+    COMMTIMEOUTS ct;
+
     handle = CreateFileA(portName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (handle == INVALID_HANDLE_VALUE) {
         std::cerr << "Error opening serial port" << std::endl;
         return false;
     }
 
-    DCB dcbSerialParams = {0};
-    dcbSerialParams.DCBlength = sizeof(dcbSerialParams);
-    if (!GetCommState(handle, &dcbSerialParams)) {
+    dcb.DCBlength = sizeof(dcb);
+    if (!GetCommState(handle, &dcb)) {
         std::cerr << "Error getting serial port state" << std::endl;
         close();
         return false;
     }
 
-    dcbSerialParams.BaudRate = baudRate;
-    // dcbSerialParams.ByteSize = 8;
-    // dcbSerialParams.StopBits = ONESTOPBIT;
-    // dcbSerialParams.Parity = NOPARITY;
+    dcb.BaudRate = baudRate;
+    dcb.ByteSize = 8;
+    dcb.StopBits = ONESTOPBIT;
+    dcb.Parity = NOPARITY;
 
-    if (!SetCommState(handle, &dcbSerialParams)) {
+    if (!SetCommState(handle, &dcb)) {
         std::cerr << "Error setting serial port state" << std::endl;
         close();
         return false;
     }
+
+    GetCommTimeouts(handle, &ct);
+    ct.ReadIntervalTimeout         = 100;
+    ct.ReadTotalTimeoutMultiplier  = 0;  
+    ct.ReadTotalTimeoutConstant    = 100; 
+    ct.WriteTotalTimeoutMultiplier = 0;
+    ct.WriteTotalTimeoutConstant   = 100;
+	SetCommTimeouts(handle, &ct);
 
     return true;
 }

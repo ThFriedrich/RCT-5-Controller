@@ -19,27 +19,29 @@ public:
     size_t temperature[2]; // Temperature in degrees Celsius (beginning and end of the section)
     size_t speed[2]; // Speed in RPM (beginning and end of the section)
     SectionType type; // Type of the section (Ramp or Static)
+    std::string name; // Name of the section
 
     std::vector<std::string> preSectionCommands; // Commands to execute before the section
     std::vector<std::string> postSectionCommands; // Commands to execute after the section
 
     Section(size_t duration, size_t temperature[2], size_t speed[2], SectionType type)
         : duration(duration), temperature(), speed(), type(type) {}
+    
+    Section() : duration(10), temperature(), speed(), type(SectionType::Static) {}
+    Section(std::string name) : duration(10), temperature(), speed(), type(SectionType::Static), name(name) {}
 };
 
 // TimeLine class definition
 class TimeLine {
-private:
+public:
+    std::string name;
     std::vector<Section> sections;
     int logInterval; // Interval for logging in seconds
     std::vector<std::string> logCommands; // Commands to execute for logging
-
-public:
     TimeLine(int logInterval) : logInterval(logInterval) {}
+    TimeLine(std::string name) : logInterval(10), name(name) {}
 
-    void addSection(const Section& section) {
-        sections.push_back(section);
-    }
+    void addSection(const Section& section);
 
     // void execute() {
     //     NamurCommands& commands = NamurCommands::getInstance(); // Get the instance of NamurCommands

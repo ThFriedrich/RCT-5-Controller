@@ -5,27 +5,30 @@
 #include <string>
 #include <vector>
 
-class SerialPort {
+class SerialPort
+{
 public:
-    SerialPort(const std::string& portName, int baudRate);
+    SerialPort(const std::string &portName, int baudRate);
     ~SerialPort();
-    
+
     bool open();
     void close();
     bool sendByte(unsigned char byte);
-    bool sendCommand(const std::string& command);
-    bool readBytes(unsigned char* buffer, size_t size);
+    bool sendCommand(const std::string &command);
+    bool readBytes(unsigned char *buffer, size_t size);
     std::string readString();
-    
+
+    std::string portName;
+    int baudRate;
+    void checkAvailablePorts();
+    std::vector<std::string> availablePorts;
 
 private:
 #ifdef _WIN32
-    void* handle;
+    void *handle;
 #else
     int fd;
 #endif
-    std::string portName;
-    int baudRate;
 };
-std::vector<std::string> listSerialPorts(); 
+std::vector<std::string> listSerialPorts();
 #endif // SERIALPORT_H

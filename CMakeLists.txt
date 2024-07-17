@@ -80,6 +80,8 @@ target_sources( RCT_5_Control PRIVATE
     src/RCT_5_Control.cpp
     src/NamurCommands.cpp
     src/ImGuiINI.hpp
+    src/Utilities.cpp
+    src/Timeline.cpp
     )
 
 target_include_directories( RCT_5_Control PUBLIC
