@@ -40,7 +40,8 @@ private:
     void send_signal(const std::string &command);
     float get_numeric_value();
     void show_connection_ui(mINI::INIStructure &config);
-
+    void show_timeline_ui(TimeLine &timeline);
+    void show_section_ui(Section &section);
     std::vector<TimeLine> timelines;
     
 };

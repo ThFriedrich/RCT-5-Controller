@@ -174,6 +174,14 @@ void RCT_5_Control::show_connection_ui(mINI::INIStructure &config)
         ImGui::Text("Device: %s", device.c_str());
     }
 }
+void RCT_5_Control::show_timeline_ui(TimeLine &timeline){
+    ImGui::Text("Timeline: %s", timeline.name.c_str());
+    if (ImGui::Button("New Section"))
+    {
+        timeline.sections.push_back(Section("Section " + std::to_string(timeline.sections.size() + 1)));
+    }
+}
+void RCT_5_Control::show_section_ui(Section &section){}
 void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext &gl_context)
 {
     // Main loop
@@ -186,9 +194,11 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
     ini_file.read(ini_cfg);
 
     // Appearance
-
+    static float fontscale = 1.0f;
     ImGuiINI::check_ini_setting(ini_cfg, "Appearance", "Font", font_index);
     ImGuiINI::set_font(font_index);
+    ImGuiINI::check_ini_setting(ini_cfg, "Appearance", "Font Scale", fontscale);
+    io.FontGlobalScale = fontscale;
     ImGuiINI::check_ini_setting(ini_cfg, "Appearance", "Style", style_index);
     ImGuiINI::set_style(style_index);
     ImGuiINI::check_ini_setting(ini_cfg, "Settings", "COM-Port", selectedPortIndex);
@@ -227,6 +237,10 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
             {
                 ImGuiINI::ShowFontSelector("Font", font_index, ini_cfg);
                 ImGuiINI::ShowStyleSelector("Style", style_index, ini_cfg);
+                if (ImGui::DragFloat("Scale Font", &io.FontGlobalScale, 0.005f, 0.3f, 1.5f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
+                    ini_cfg["Appearance"]["Font Scale"] = std::to_string(io.FontGlobalScale);
+                }
+
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Connection"))
@@ -246,6 +260,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
 
         if (ImGui::BeginTabBar("TabBar1", tab_bar_flags))
         {
+            
             if (ImGui::BeginTabItem("Direct Interface", NULL, ImGuiTabItemFlags_None))
             {
                 show_connection_ui(ini_cfg);
@@ -299,7 +314,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                 static int section_mask = (1 << 0);
                 int timeline_clicked = -1;
                 int section_clicked = -1;
-                bool last_click_section = true; // true if last click was on a section
+                static bool last_click_section = true; // true if last click was on a section
                 ImGui::BeginColumns("columns", 2);
                 {
                     static bool first_time = true;
@@ -326,29 +341,34 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                             // Disable the default "open on single-click behavior" + set Selected flag according to our selection.
                             // To alter selection we use IsItemClicked() && !IsItemToggledOpen(), so clicking on an arrow doesn't alter selection.
                             ImGuiTreeNodeFlags tl_node_flags = tree_flags;
-                            ImGuiTreeNodeFlags sec_node_flags = tree_flags;
                             const bool tl_is_selected = (timeline_mask & (1 << i)) != 0;
                             if (tl_is_selected)
                                 tl_node_flags |= ImGuiTreeNodeFlags_Selected;
 
                             bool node_open = ImGui::TreeNodeEx(timelines[i].name.c_str(), tl_node_flags, timelines[i].name.c_str());
                             if (ImGui::IsItemClicked())
+                            {
+
                                 timeline_clicked = i;
                                 last_click_section = false;
+                            }
 
                             if (node_open)
                             {
                                 for (int j = 0; j < timelines[i].sections.size(); j++)
                                 {
+                                    ImGuiTreeNodeFlags sec_node_flags = tree_flags;
                                     const bool se_is_selected = (section_mask & (1 << j)) != 0;
-                                    if (se_is_selected && tl_is_selected)
+                                    if (se_is_selected && tl_is_selected && last_click_section)
                                         sec_node_flags |= ImGuiTreeNodeFlags_Selected;
                                     sec_node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
                                     ImGui::TreeNodeEx(timelines[i].sections[j].name.c_str(), sec_node_flags, timelines[i].sections[j].name.c_str());
                                     if (ImGui::IsItemClicked())
+                                    {
                                         section_clicked = j;
                                         timeline_clicked = i;
                                         last_click_section = true;
+                                    }
                                 }
                                 if (section_clicked != -1)
                                 {
@@ -369,7 +389,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                     int index_tl = bitmask2index(timeline_mask);
                     int index_sec = bitmask2index(section_mask);
 
-                    ImGui::Text("Selected Timeline Index %d",index_tl);
+                    ImGui::Text("Selected Timeline Index %d", index_tl);
                     ImGui::Text("Selected Section Index %d", index_sec);
                     if (!last_click_section)
                     {
@@ -408,8 +428,6 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
         SDL_GL_SwapWindow(window);
     }
 
-    // Save INI file settings
-    ini_file.write(ini_cfg);
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
@@ -419,4 +437,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);
     SDL_Quit();
+    
+    // Save INI file settings
+    ini_file.write(ini_cfg);
 }
