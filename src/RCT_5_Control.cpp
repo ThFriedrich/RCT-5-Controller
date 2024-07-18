@@ -2,15 +2,15 @@
 #include "SerialPort.h"
 #include <vector>
 #include <string>
+#include <bit>
 #include "imgui.h"
 #include "imgui_internal.h"
-#include "imgui_stdlib.h"
 
 #include "ImGuiINI.hpp"
 #define MINI_CASE_SENSITIVE
 #include "ini.h"
 #include "Utilities.h"
-#include <bit>
+#include "imgui_stdlib.h"
 
 RCT_5_Control::RCT_5_Control()
 {
@@ -124,7 +124,7 @@ void RCT_5_Control::show_connection_ui(mINI::INIStructure &config)
     }
     if (ImGui::BeginCombo("Serial Ports", selectedPortIndex >= 0 ? availablePorts[selectedPortIndex].c_str() : "Select a port"))
     {
-        for (int i = 0; i < availablePorts.size(); ++i)
+        for (size_t i = 0; i < availablePorts.size(); ++i)
         {
             bool isSelected = (selectedPortIndex == i);
             if (ImGui::Selectable(availablePorts[i].c_str(), isSelected))
@@ -142,7 +142,7 @@ void RCT_5_Control::show_connection_ui(mINI::INIStructure &config)
 
     if (ImGui::BeginCombo("Baud Rate", std::to_string(baudRates[selectedBaudRateIndex]).c_str()))
     {
-        for (int i = 0; i < baudRates.size(); ++i)
+        for (size_t i = 0; i < baudRates.size(); ++i)
         {
             bool isSelected = (selectedBaudRateIndex == i);
             if (ImGui::Selectable(std::to_string(baudRates[i]).c_str(), isSelected))
@@ -174,14 +174,25 @@ void RCT_5_Control::show_connection_ui(mINI::INIStructure &config)
         ImGui::Text("Device: %s", device.c_str());
     }
 }
-void RCT_5_Control::show_timeline_ui(TimeLine &timeline){
+void RCT_5_Control::show_timeline_ui(TimeLine &timeline)
+{
     ImGui::Text("Timeline: %s", timeline.name.c_str());
     if (ImGui::Button("New Section"))
     {
         timeline.sections.push_back(Section("Section " + std::to_string(timeline.sections.size() + 1)));
     }
 }
-void RCT_5_Control::show_section_ui(Section &section){}
+void RCT_5_Control::show_section_ui(Section &section)
+{
+    ImGui::Text(section.name.c_str());
+    static bool demo = false;
+    ImGui::Checkbox("Demo", &demo);
+    if (demo)
+    {
+        ImGui::ShowDemoWindow();
+    }
+
+}
 void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext &gl_context)
 {
     // Main loop
@@ -237,7 +248,8 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
             {
                 ImGuiINI::ShowFontSelector("Font", font_index, ini_cfg);
                 ImGuiINI::ShowStyleSelector("Style", style_index, ini_cfg);
-                if (ImGui::DragFloat("Scale Font", &io.FontGlobalScale, 0.005f, 0.3f, 1.5f, "%.2f", ImGuiSliderFlags_AlwaysClamp)) {
+                if (ImGui::DragFloat("Scale Font", &io.FontGlobalScale, 0.005f, 0.3f, 1.5f, "%.2f", ImGuiSliderFlags_AlwaysClamp))
+                {
                     ini_cfg["Appearance"]["Font Scale"] = std::to_string(io.FontGlobalScale);
                 }
 
@@ -260,13 +272,13 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
 
         if (ImGui::BeginTabBar("TabBar1", tab_bar_flags))
         {
-            
+
             if (ImGui::BeginTabItem("Direct Interface", NULL, ImGuiTabItemFlags_None))
             {
                 show_connection_ui(ini_cfg);
                 if (ImGui::BeginCombo("Commands", selectedCommandIndex >= 0 ? namur.getCommandDetails(namur[selectedCommandIndex]).description.c_str() : "Select a command"))
                 {
-                    for (size_t i = 0; i < namur.size(); ++i)
+                    for (int i = 0; i < namur.size(); ++i)
                     {
                         bool isSelected = (selectedCommandIndex == i);
                         std::string command = namur.getCommandDetails(namur[i]).description;
@@ -310,6 +322,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
             }
             if (ImGui::BeginTabItem("Script Editor", NULL, ImGuiTabItemFlags_None))
             {
+                // Tree view for timelines and sections
                 static int timeline_mask = (1 << 0);
                 static int section_mask = (1 << 0);
                 int timeline_clicked = -1;
@@ -327,7 +340,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                     if (ImGui::Button("New Timeline"))
                     {
                         timelines.push_back(TimeLine("Timeline " + std::to_string(timelines.size() + 1)));
-                        timeline_mask = (1 << timelines.size() - 1);
+                        timeline_mask = (1 << (timelines.size() - 1));
                     }
                     if (timelines.size() > 0)
                     {
@@ -336,7 +349,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                         // 'node_clicked' is temporary storage of what node we have clicked to process selection at the end
                         /// of the loop. May be a pointer to your own node type, etc.
 
-                        for (int i = 0; i < timelines.size(); i++)
+                        for (size_t i = 0; i < timelines.size(); i++)
                         {
                             // Disable the default "open on single-click behavior" + set Selected flag according to our selection.
                             // To alter selection we use IsItemClicked() && !IsItemToggledOpen(), so clicking on an arrow doesn't alter selection.
@@ -348,14 +361,13 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                             bool node_open = ImGui::TreeNodeEx(timelines[i].name.c_str(), tl_node_flags, timelines[i].name.c_str());
                             if (ImGui::IsItemClicked())
                             {
-
                                 timeline_clicked = i;
                                 last_click_section = false;
                             }
 
                             if (node_open)
                             {
-                                for (int j = 0; j < timelines[i].sections.size(); j++)
+                                for (size_t j = 0; j < timelines[i].sections.size(); j++)
                                 {
                                     ImGuiTreeNodeFlags sec_node_flags = tree_flags;
                                     const bool se_is_selected = (section_mask & (1 << j)) != 0;
@@ -393,13 +405,11 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                     ImGui::Text("Selected Section Index %d", index_sec);
                     if (!last_click_section)
                     {
-                        if (ImGui::Button("New Section"))
-                        {
-                            if (timeline_mask != 0)
-                            {
-                                timelines[index_tl].sections.push_back(Section("Section " + std::to_string(timelines[index_tl].sections.size() + 1)));
-                            }
-                        }
+                        show_timeline_ui(timelines[index_tl]);
+                    }
+                    else if (timelines.size() > 0 && timelines[index_tl].sections.size() > 0)
+                    {
+                        show_section_ui(timelines[index_tl].sections[index_sec]);
                     }
 
                     ImGui::EndColumns();
@@ -419,7 +429,6 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
 
         // Rendering
         ImGui::Render();
-        int display_w, display_h;
 
         glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
         // glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
@@ -427,7 +436,6 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
     }
-
 
     // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
@@ -437,7 +445,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
     SDL_GL_DeleteContext(gl_context);
     SDL_DestroyWindow(window);
     SDL_Quit();
-    
+
     // Save INI file settings
     ini_file.write(ini_cfg);
 }
