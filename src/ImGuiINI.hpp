@@ -60,7 +60,7 @@ namespace ImGuiINI
         ImFont *font_current = ImGui::GetFont();
         if (ImGui::BeginCombo(label, font_names[selectedFont]))
         {
-            for (int n = 0; n < io.Fonts->Fonts.Size; n++)
+            for (int n = 0; n < io.Fonts->Fonts.Size/2; n++)
             {
                 ImFont *font = io.Fonts->Fonts[n];
                 ImGui::PushID((void *)font);

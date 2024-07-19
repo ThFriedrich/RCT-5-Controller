@@ -20,7 +20,9 @@ public:
     size_t speed[2]; // Speed in RPM (beginning and end of the section)
     SectionType type; // Type of the section (Ramp or Static)
     std::string name; // Name of the section
-
+    std::string description; // Description of the section
+    bool wait; // Wait for user input before proceeding to the next section
+    
     std::vector<std::string> preSectionCommands; // Commands to execute before the section
     std::vector<std::string> postSectionCommands; // Commands to execute after the section
 
@@ -35,8 +37,14 @@ public:
 class TimeLine {
 public:
     std::string name;
+    std::string description; // Description of the timeline
     std::vector<Section> sections;
-    int logInterval; // Interval for logging in seconds
+    size_t logInterval; // Interval for logging in seconds
+    bool logTemperaturePlate; // Log temperature plate readings
+    bool logSpeed; // Log speed readings
+    bool logViscosity; // Log viscosity readings
+    bool logTemperatureSensor; // Log temperature sensor readings
+
     std::vector<std::string> logCommands; // Commands to execute for logging
     TimeLine(int logInterval) : logInterval(logInterval) {}
     TimeLine(std::string name) : logInterval(10), name(name) {}

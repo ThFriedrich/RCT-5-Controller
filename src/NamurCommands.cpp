@@ -70,9 +70,17 @@ std::string NamurCommands::to_string(const std::string &command) {
     NamurCommands::CommandDetails& it = commands.at(command);
     if (it.requiresValue) {
         if (result[result.size() - 1] != '@') {
-            result += " ";
+            result.replace(result.size() - 1, 1, " ");
         }
         result += std::to_string(parameter);
+    }
+    return result;
+}
+
+std::string NamurCommands::get_base_command(const std::string &command) {
+    std::string result = command;
+    if (result[result.size() - 1] != '@') {
+        result.replace(result.size() - 1, 1, " ");
     }
     return result;
 }

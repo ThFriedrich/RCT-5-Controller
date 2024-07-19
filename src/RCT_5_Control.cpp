@@ -38,6 +38,7 @@ void RCT_5_Control::checkAvailablePorts()
 {
     availablePorts = listSerialPorts();
 }
+
 void RCT_5_Control::connectPort()
 {
     if (selectedPortIndex < 0)
@@ -62,6 +63,7 @@ void RCT_5_Control::connectPort()
         connected = false;
     }
 }
+
 void RCT_5_Control::get_device_name()
 {
     device = "No device detected";
@@ -79,6 +81,7 @@ void RCT_5_Control::get_device_name()
         }
     }
 }
+
 float RCT_5_Control::get_numeric_value()
 {
     if (namur.responseText.size() > 0)
@@ -94,6 +97,7 @@ float RCT_5_Control::get_numeric_value()
         return 0.0f;
     }
 }
+
 void RCT_5_Control::send_signal(const std::string &command)
 {
     if (serialPort && connected)
@@ -116,6 +120,7 @@ void RCT_5_Control::send_signal(const std::string &command)
         namur.responseText = "Serial port not connected";
     }
 }
+
 void RCT_5_Control::show_connection_ui(mINI::INIStructure &config)
 {
     if (ImGui::Button("Refresh Ports", ImVec2(-1, 0)))
@@ -174,24 +179,216 @@ void RCT_5_Control::show_connection_ui(mINI::INIStructure &config)
         ImGui::Text("Device: %s", device.c_str());
     }
 }
-void RCT_5_Control::show_timeline_ui(TimeLine &timeline)
+
+void RCT_5_Control::show_command_ui()
 {
-    ImGui::Text("Timeline: %s", timeline.name.c_str());
+    if (ImGui::BeginCombo("Commands", selectedCommandIndex >= 0 ? namur.getCommandDetails(namur[selectedCommandIndex]).description.c_str() : "Select a command"))
+    {
+        for (int i = 0; i < namur.size(); ++i)
+        {
+            bool isSelected = (selectedCommandIndex == i);
+            std::string command = namur.getCommandDetails(namur[i]).description;
+            if (ImGui::Selectable(command.c_str(), isSelected))
+            {
+                selectedCommandIndex = i;
+            }
+            if (isSelected)
+            {
+                ImGui::SetItemDefaultFocus();
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip(namur[i].c_str());
+            }
+        }
+        ImGui::EndCombo();
+    }
+    if (selectedCommandIndex >= 0)
+    {
+        auto commandDetails = namur.getCommandDetails(namur[selectedCommandIndex]);
+        if (commandDetails.requiresValue)
+        {
+            ImGui::InputScalar("Parameter", ImGuiDataType_U16, &namur.parameter);
+        }
+    }
+}
+void RCT_5_Control::show_timeline_ui(TimeLine &timeline, ImGuiIO &io)
+{
+    ImGui::PushFont(io.Fonts->Fonts[font_index + 6]);
+    ImGui::InputText("Name", &timeline.name);
+    ImGui::PopFont();
+    ImGui::InputTextMultiline("Description", &timeline.description);
+    ImGui::InputScalar("Log Interval", ImGuiDataType_U64, &timeline.logInterval);
+
+    ImGui::Checkbox("Log Temperature (Plate)", &timeline.logTemperaturePlate);
+    ImGui::SameLine();
+    ImGui::Checkbox("Log Temperature (Sensor)", &timeline.logTemperatureSensor);
+    ImGui::SameLine();
+    ImGui::Checkbox("Log Speed", &timeline.logSpeed);
+    ImGui::SameLine();
+    ImGui::Checkbox("Log Viscosity Trend", &timeline.logSpeed);
+
     if (ImGui::Button("New Section"))
     {
         timeline.sections.push_back(Section("Section " + std::to_string(timeline.sections.size() + 1)));
     }
-}
-void RCT_5_Control::show_section_ui(Section &section)
-{
-    ImGui::Text(section.name.c_str());
-    static bool demo = false;
-    ImGui::Checkbox("Demo", &demo);
-    if (demo)
+    if (timeline.sections.size() > 0)
     {
-        ImGui::ShowDemoWindow();
+        ImGui::BeginTable("Sections", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable, ImVec2(-1, -1));
+        ImGui::TableSetupColumn("Name");
+        ImGui::TableSetupColumn("Duration");
+        ImGui::TableSetupColumn("Temperature Start");
+        ImGui::TableSetupColumn("Temperature End");
+        ImGui::TableSetupColumn("Speed Start");
+        ImGui::TableSetupColumn("Speed End");
+        ImGui::TableSetupColumn("Wait");
+        ImGui::TableHeadersRow();
+
+        for (size_t i = 0; i < timeline.sections.size(); i++)
+        {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::InputText(("##Name" + std::to_string(i)).c_str(), &timeline.sections[i].name);
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::InputScalar(("##Duration" + std::to_string(i)).c_str(), ImGuiDataType_U16, &timeline.sections[i].duration);
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::InputScalar(("##TempStart" + std::to_string(i)).c_str(), ImGuiDataType_U16, &timeline.sections[i].temperature[0]);
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::InputScalar(("##TempEnd" + std::to_string(i)).c_str(), ImGuiDataType_U16, &timeline.sections[i].temperature[1]);
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::InputScalar(("##SpeedStart" + std::to_string(i)).c_str(), ImGuiDataType_U16, &timeline.sections[i].speed[0]);
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::InputScalar(("##SpeedEnd" + std::to_string(i)).c_str(), ImGuiDataType_U16, &timeline.sections[i].speed[1]);
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::Checkbox(("##Wait" + std::to_string(i)).c_str(), &timeline.sections[i].wait);
+        }
+        ImGui::EndTable();
+    }
+}
+void RCT_5_Control::show_section_ui(Section &section, ImGuiIO &io)
+{
+    ImGui::PushFont(io.Fonts->Fonts[font_index + 6]);
+    ImGui::InputText("Section", &section.name);
+    ImGui::PopFont();
+    ImGui::SetItemTooltip("Name of the section");
+    ImGui::InputTextMultiline("Description", &section.description);
+    ImGui::SetItemTooltip("Description of the section");
+    ImGui::InputScalar("Duration", ImGuiDataType_U64, &section.duration);
+    ImGui::SetItemTooltip("Duration in seconds");
+    ImGui::InputScalar("Temperature Start", ImGuiDataType_U16, &section.temperature[0]);
+    ImGui::SetItemTooltip("Temperature at the beginning of the section in degrees Celsius");
+    ImGui::InputScalar("Temperature End", ImGuiDataType_U16, &section.temperature[1]);
+    ImGui::SetItemTooltip("Temperature at the end of the section in degrees Celsius");
+    ImGui::InputScalar("Speed Start", ImGuiDataType_U16, &section.speed[0]);
+    ImGui::SetItemTooltip("Rotation speed at the beginning of the section in RPM");
+    ImGui::InputScalar("Speed End", ImGuiDataType_U16, &section.speed[1]);
+    ImGui::SetItemTooltip("Rotation speed at the end of the section in RPM");
+    ImGui::Checkbox("Wait", &section.wait);
+    ImGui::SetItemTooltip("Wait for user input before proceeding to the next section");
+
+    if (ImGui::Button("Add Pre-Section Command"))
+    {
+        if (selectedCommandIndex >= 0)
+            section.preSectionCommands.push_back(namur.to_string(namur[selectedCommandIndex]));
+    }
+    ImGui::SetItemTooltip("Commands to execute before the section");
+    ImGui::SameLine();
+    if (ImGui::Button("Add Post-Section Command"))
+    {
+        if (selectedCommandIndex >= 0)
+            section.postSectionCommands.push_back(namur.to_string(namur[selectedCommandIndex]));
+    }
+    ImGui::SetItemTooltip("Commands to execute after the section");
+
+    show_command_ui();
+
+    if (section.preSectionCommands.size() > 0)
+    {
+        ImGui::BeginTable("Pre-Section Commands", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable, ImVec2(-1, 0));
+        ImGui::TableSetupColumn("Pre-Section Commands", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Modify", ImGuiTableColumnFlags_WidthFixed);
+        ImGui::TableHeadersRow();
+        for (size_t i = 0; i < section.preSectionCommands.size(); i++)
+        {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::Text(section.preSectionCommands[i].c_str());
+            std::string base_command = section.preSectionCommands[i].substr(0, section.preSectionCommands[i].find(" "));
+            base_command = base_command.substr(0, base_command.find("@"));
+            ImGui::SetItemTooltip(namur.getCommandDetails(base_command).description.c_str());
+            ImGui::TableNextColumn();
+            if (ImGui::Button(("Move up##PreCommand" + std::to_string(i)).c_str()))
+            {
+                if (i > 0)
+                {
+                    std::swap(section.preSectionCommands[i], section.preSectionCommands[i - 1]);
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(("Move down##PreCommand" + std::to_string(i)).c_str()))
+            {
+                if (i < section.preSectionCommands.size() - 1)
+                {
+                    std::swap(section.preSectionCommands[i], section.preSectionCommands[i + 1]);
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(("Delete##PreCommand" + std::to_string(i)).c_str()))
+            {
+                section.preSectionCommands.erase(section.preSectionCommands.begin() + i);
+            }
+        }
+        ImGui::EndTable();
     }
 
+    if (section.postSectionCommands.size() > 0)
+    {
+        ImGui::BeginTable("Post-Section Commands", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable, ImVec2(-1, 0));
+        ImGui::TableSetupColumn("Post-Section Commands", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Modify",ImGuiTableColumnFlags_WidthFixed );
+        ImGui::TableHeadersRow();
+
+        for (size_t i = 0; i < section.postSectionCommands.size(); i++)
+        {
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::Text(section.postSectionCommands[i].c_str());
+            std::string base_command = section.postSectionCommands[i].substr(0, section.preSectionCommands[i].find(" "));
+            base_command = base_command.substr(0, base_command.find("@"));
+            ImGui::SetItemTooltip(namur.getCommandDetails(base_command).description.c_str());
+            ImGui::TableNextColumn();
+            if (ImGui::Button(("Move up##PostCommand" + std::to_string(i)).c_str()))
+            {
+                if (i > 0)
+                {
+                    std::swap(section.postSectionCommands[i], section.postSectionCommands[i - 1]);
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(("Move down##PostCommand" + std::to_string(i)).c_str()))
+            {
+                if (i < section.postSectionCommands.size() - 1)
+                {
+                    std::swap(section.postSectionCommands[i], section.postSectionCommands[i + 1]);
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(("Delete##PostCommand" + std::to_string(i)).c_str()))
+            {
+                section.postSectionCommands.erase(section.postSectionCommands.begin() + i);
+            }
+        }
+        ImGui::EndTable();
+    }
 }
 void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext &gl_context)
 {
@@ -248,7 +445,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
             {
                 ImGuiINI::ShowFontSelector("Font", font_index, ini_cfg);
                 ImGuiINI::ShowStyleSelector("Style", style_index, ini_cfg);
-                if (ImGui::DragFloat("Scale Font", &io.FontGlobalScale, 0.005f, 0.3f, 1.5f, "%.2f", ImGuiSliderFlags_AlwaysClamp))
+                if (ImGui::DragFloat("Scale Font", &io.FontGlobalScale, 0.005f, 0.5f, 2.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp))
                 {
                     ini_cfg["Appearance"]["Font Scale"] = std::to_string(io.FontGlobalScale);
                 }
@@ -401,15 +598,15 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                     int index_tl = bitmask2index(timeline_mask);
                     int index_sec = bitmask2index(section_mask);
 
-                    ImGui::Text("Selected Timeline Index %d", index_tl);
-                    ImGui::Text("Selected Section Index %d", index_sec);
+                    // ImGui::Text("Selected Timeline Index %d", index_tl);
+                    // ImGui::Text("Selected Section Index %d", index_sec);
                     if (!last_click_section)
                     {
-                        show_timeline_ui(timelines[index_tl]);
+                        show_timeline_ui(timelines[index_tl], io);
                     }
                     else if (timelines.size() > 0 && timelines[index_tl].sections.size() > 0)
                     {
-                        show_section_ui(timelines[index_tl].sections[index_sec]);
+                        show_section_ui(timelines[index_tl].sections[index_sec], io);
                     }
 
                     ImGui::EndColumns();
@@ -431,7 +628,6 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
         ImGui::Render();
 
         glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-        // glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
