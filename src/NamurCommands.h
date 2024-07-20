@@ -28,8 +28,9 @@ public:
     const NamurCommands::CommandDetails &getCommandDetails(const std::string &command) const;
 
     uint16_t parameter;       // Parameter value e.g. Temperature, Speed, etc.
+    uint16_t n;               // Number of commands
     std::string responseText; // Response text from the device
-
+    std::string get_base_command(const std::string &command);
 private:
     std::map<std::string, CommandDetails> commands;
 };

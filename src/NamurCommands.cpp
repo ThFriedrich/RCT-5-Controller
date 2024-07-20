@@ -28,23 +28,15 @@ NamurCommands::NamurCommands() {
         {"OUT_WD2@", {"Watchdog mode 2: if event WD2 occurs, speed and temperature limits change. Reset with OUT_WD2@0.", true, true}}
     };
     parameter = 0;
+    n = commands.size();
 }
 
 size_t NamurCommands::size() {
     return commands.size();
 }
 
-std::string NamurCommands::operator[](int id) {
-    if (id < 0 || id >= commands.size()) {
-        return "Invalid command ID";
-    }
-    auto it = commands.begin();
-    std::advance(it, id);
-    return it->first;
-}
-
 std::string NamurCommands::operator[](size_t id) {
-    if (id < 0 || id >= commands.size()) {
+    if (id >= n) {
         return "Invalid command ID";
     }
     auto it = commands.begin();
@@ -70,7 +62,7 @@ std::string NamurCommands::to_string(const std::string &command) {
     NamurCommands::CommandDetails& it = commands.at(command);
     if (it.requiresValue) {
         if (result[result.size() - 1] != '@') {
-            result.replace(result.size() - 1, 1, " ");
+            result += " ";
         }
         result += std::to_string(parameter);
     }
@@ -78,9 +70,9 @@ std::string NamurCommands::to_string(const std::string &command) {
 }
 
 std::string NamurCommands::get_base_command(const std::string &command) {
-    std::string result = command;
-    if (result[result.size() - 1] != '@') {
-        result.replace(result.size() - 1, 1, " ");
-    }
-    return result;
+    std::string  base_command;
+    base_command = command.substr(0, command.find(" "));
+    if (base_command.find("@")<base_command.size())
+        base_command = base_command.substr(0, base_command.find("@")+1);
+    return base_command;
 }

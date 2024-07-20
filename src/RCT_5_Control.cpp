@@ -12,6 +12,11 @@
 #include "Utilities.h"
 #include "imgui_stdlib.h"
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic ignored "-Wint-to-pointer-cast"
+#pragma GCC diagnostic ignored "-Wformat-security"
+#endif
+
 RCT_5_Control::RCT_5_Control()
 {
     serialPort = nullptr;
@@ -26,7 +31,7 @@ RCT_5_Control::RCT_5_Control()
 }
 
 static std::string statusMessage = "No serial port connected";
-static int selectedCommandIndex = -1;
+static size_t selectedCommandIndex = -1;
 static int font_index = 0;
 static int style_index = 0;
 
@@ -41,7 +46,7 @@ void RCT_5_Control::checkAvailablePorts()
 
 void RCT_5_Control::connectPort()
 {
-    if (selectedPortIndex < 0)
+    if (selectedPortIndex > availablePorts.size())
     {
         statusMessage = "No port selected";
         connected = false;
@@ -127,7 +132,7 @@ void RCT_5_Control::show_connection_ui(mINI::INIStructure &config)
     {
         checkAvailablePorts();
     }
-    if (ImGui::BeginCombo("Serial Ports", selectedPortIndex >= 0 ? availablePorts[selectedPortIndex].c_str() : "Select a port"))
+    if (ImGui::BeginCombo("Serial Ports", selectedPortIndex < availablePorts.size() ? availablePorts[selectedPortIndex].c_str() : "Select a port"))
     {
         for (size_t i = 0; i < availablePorts.size(); ++i)
         {
@@ -182,9 +187,9 @@ void RCT_5_Control::show_connection_ui(mINI::INIStructure &config)
 
 void RCT_5_Control::show_command_ui()
 {
-    if (ImGui::BeginCombo("Commands", selectedCommandIndex >= 0 ? namur.getCommandDetails(namur[selectedCommandIndex]).description.c_str() : "Select a command"))
+    if (ImGui::BeginCombo("Commands", selectedCommandIndex < namur.n ? namur.getCommandDetails(namur[selectedCommandIndex]).description.c_str() : "Select a command"))
     {
-        for (int i = 0; i < namur.size(); ++i)
+        for (size_t i = 0; i < namur.size(); ++i)
         {
             bool isSelected = (selectedCommandIndex == i);
             std::string command = namur.getCommandDetails(namur[i]).description;
@@ -203,7 +208,7 @@ void RCT_5_Control::show_command_ui()
         }
         ImGui::EndCombo();
     }
-    if (selectedCommandIndex >= 0)
+    if (selectedCommandIndex < namur.n)
     {
         auto commandDetails = namur.getCommandDetails(namur[selectedCommandIndex]);
         if (commandDetails.requiresValue)
@@ -226,7 +231,7 @@ void RCT_5_Control::show_timeline_ui(TimeLine &timeline, ImGuiIO &io)
     ImGui::SameLine();
     ImGui::Checkbox("Log Speed", &timeline.logSpeed);
     ImGui::SameLine();
-    ImGui::Checkbox("Log Viscosity Trend", &timeline.logSpeed);
+    ImGui::Checkbox("Log Viscosity Trend", &timeline.logViscosity);
 
     if (ImGui::Button("New Section"))
     {
@@ -290,19 +295,21 @@ void RCT_5_Control::show_section_ui(Section &section, ImGuiIO &io)
     ImGui::SetItemTooltip("Rotation speed at the beginning of the section in RPM");
     ImGui::InputScalar("Speed End", ImGuiDataType_U16, &section.speed[1]);
     ImGui::SetItemTooltip("Rotation speed at the end of the section in RPM");
-    ImGui::Checkbox("Wait", &section.wait);
     ImGui::SetItemTooltip("Wait for user input before proceeding to the next section");
+    ImGui::Checkbox("Wait", &section.wait);
+    ImGui::SetItemTooltip("Sound a beep at the end of the section");
+    ImGui::Checkbox("Beep on completion", &section.b_beep);
 
     if (ImGui::Button("Add Pre-Section Command"))
     {
-        if (selectedCommandIndex >= 0)
+        if (selectedCommandIndex < namur.n)
             section.preSectionCommands.push_back(namur.to_string(namur[selectedCommandIndex]));
     }
     ImGui::SetItemTooltip("Commands to execute before the section");
     ImGui::SameLine();
     if (ImGui::Button("Add Post-Section Command"))
     {
-        if (selectedCommandIndex >= 0)
+        if (selectedCommandIndex < namur.n)
             section.postSectionCommands.push_back(namur.to_string(namur[selectedCommandIndex]));
     }
     ImGui::SetItemTooltip("Commands to execute after the section");
@@ -320,9 +327,8 @@ void RCT_5_Control::show_section_ui(Section &section, ImGuiIO &io)
             ImGui::TableNextRow();
             ImGui::TableNextColumn();
             ImGui::SetNextItemWidth(-FLT_MIN);
-            ImGui::Text(section.preSectionCommands[i].c_str());
-            std::string base_command = section.preSectionCommands[i].substr(0, section.preSectionCommands[i].find(" "));
-            base_command = base_command.substr(0, base_command.find("@"));
+            ImGui::TextUnformatted(section.preSectionCommands[i].c_str());
+            std::string base_command = namur.get_base_command(section.preSectionCommands[i]);
             ImGui::SetItemTooltip(namur.getCommandDetails(base_command).description.c_str());
             ImGui::TableNextColumn();
             if (ImGui::Button(("Move up##PreCommand" + std::to_string(i)).c_str()))
@@ -353,7 +359,7 @@ void RCT_5_Control::show_section_ui(Section &section, ImGuiIO &io)
     {
         ImGui::BeginTable("Post-Section Commands", 2, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable, ImVec2(-1, 0));
         ImGui::TableSetupColumn("Post-Section Commands", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Modify",ImGuiTableColumnFlags_WidthFixed );
+        ImGui::TableSetupColumn("Modify", ImGuiTableColumnFlags_WidthFixed);
         ImGui::TableHeadersRow();
 
         for (size_t i = 0; i < section.postSectionCommands.size(); i++)
@@ -362,8 +368,7 @@ void RCT_5_Control::show_section_ui(Section &section, ImGuiIO &io)
             ImGui::TableNextColumn();
             ImGui::SetNextItemWidth(-FLT_MIN);
             ImGui::Text(section.postSectionCommands[i].c_str());
-            std::string base_command = section.postSectionCommands[i].substr(0, section.preSectionCommands[i].find(" "));
-            base_command = base_command.substr(0, base_command.find("@"));
+            std::string base_command = namur.get_base_command(section.postSectionCommands[i]);
             ImGui::SetItemTooltip(namur.getCommandDetails(base_command).description.c_str());
             ImGui::TableNextColumn();
             if (ImGui::Button(("Move up##PostCommand" + std::to_string(i)).c_str()))
@@ -473,9 +478,9 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
             if (ImGui::BeginTabItem("Direct Interface", NULL, ImGuiTabItemFlags_None))
             {
                 show_connection_ui(ini_cfg);
-                if (ImGui::BeginCombo("Commands", selectedCommandIndex >= 0 ? namur.getCommandDetails(namur[selectedCommandIndex]).description.c_str() : "Select a command"))
+                if (ImGui::BeginCombo("Commands", selectedCommandIndex < namur.n ? namur.getCommandDetails(namur[selectedCommandIndex]).description.c_str() : "Select a command"))
                 {
-                    for (int i = 0; i < namur.size(); ++i)
+                    for (size_t i = 0; i < namur.size(); ++i)
                     {
                         bool isSelected = (selectedCommandIndex == i);
                         std::string command = namur.getCommandDetails(namur[i]).description;
@@ -494,7 +499,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                     }
                     ImGui::EndCombo();
                 }
-                if (selectedCommandIndex >= 0)
+                if (selectedCommandIndex < namur.n)
                 {
                     auto commandDetails = namur.getCommandDetails(namur[selectedCommandIndex]);
                     if (commandDetails.requiresValue)
@@ -506,7 +511,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                     if (ImGui::Button("Send Signal"))
                     {
                         send_signal(namur.to_string(namur[selectedCommandIndex]));
-                        if (namur[selectedCommandIndex] != "IN_NAME" && selectedCommandIndex >= 0 && namur.getCommandDetails(namur[selectedCommandIndex]).returnsValue)
+                        if (namur[selectedCommandIndex] != "IN_NAME" && selectedCommandIndex < namur.n && namur.getCommandDetails(namur[selectedCommandIndex]).returnsValue)
                         {
                             float responseFloat = get_numeric_value();
                             namur.responseText = ftos(responseFloat, 1);

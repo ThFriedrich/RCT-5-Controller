@@ -15,11 +15,11 @@ public:
     void close();
     bool sendByte(unsigned char byte);
     bool sendCommand(const std::string &command);
-    bool readBytes(unsigned char *buffer, size_t size);
+    bool readBytes(unsigned char *buffer);
     std::string readString();
 
-    std::string portName;
     int baudRate;
+    std::string portName;
     void checkAvailablePorts();
     std::vector<std::string> availablePorts;
 

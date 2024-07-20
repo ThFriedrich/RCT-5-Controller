@@ -82,6 +82,7 @@ target_sources( RCT_5_Control PRIVATE
     src/ImGuiINI.hpp
     src/Utilities.cpp
     src/Timeline.cpp
+    src/beeper.cpp
     )
 
 target_include_directories( RCT_5_Control PUBLIC

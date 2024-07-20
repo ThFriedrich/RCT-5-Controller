@@ -25,8 +25,8 @@ private:
     SerialPort *serialPort;
     std::vector<std::string> availablePorts;
     std::vector<uint32_t> baudRates;
-    int selectedBaudRateIndex;
-    int selectedPortIndex;
+    size_t selectedBaudRateIndex;
+    size_t selectedPortIndex;
     bool connected;
     bool rct_detected;
     bool auto_connect;
