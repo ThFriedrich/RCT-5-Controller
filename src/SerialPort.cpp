@@ -1,10 +1,12 @@
 #include "SerialPort.h"
 #include <algorithm>
+#include <string>
+#include <vector>
 
 #ifdef _WIN32
 #include <windows.h>
-#include <string>
 
+// Windows implementation
 SerialPort::SerialPort(const std::string& portName, int baudRate)
     : handle(nullptr), portName(portName), baudRate(baudRate) {}
 
@@ -75,7 +77,7 @@ bool SerialPort::sendCommand(const std::string& command) {
 std::string SerialPort::readString() {
     std::string result;
     char buffer;
-    DWORD bytes_read;
+    unsigned long bytes_read;
     
     while (true) {
         if (!ReadFile(handle, &buffer, 1, &bytes_read, NULL)) {
@@ -94,9 +96,9 @@ std::string SerialPort::readString() {
     return result;
 }
 
-bool SerialPort::readBytes(unsigned char* buffer, size_t size) {
-    DWORD bytes_read;
-    if (!ReadFile(handle, buffer, size, &bytes_read, NULL)) {
+bool SerialPort::readBytes(unsigned char* buffer) {
+    unsigned long bytes_read;
+    if (!ReadFile(handle, buffer, 1, &bytes_read, NULL)) {
         std::cerr << "Error reading from serial port" << std::endl;
         return false;
     }
@@ -113,7 +115,7 @@ std::vector<std::string> listSerialPorts()
     for (int i = 0; i < 255; i++) // checking ports from COM0 to COM255
     {
         std::string str = "COM" + std::to_string(i); // converting to COM0, COM1, COM2
-        DWORD test = QueryDosDeviceA(str.c_str(), lpTargetPath, 5000);
+        unsigned long test = QueryDosDeviceA(str.c_str(), lpTargetPath, 5000);
 
         // Test the return value and error if any
         if (test  != 0) //QueryDosDevice returns zero if it didn't find an object
@@ -128,11 +130,14 @@ std::vector<std::string> listSerialPorts()
     return ports;
 }
 
+// Linux implementation
 #else
 #include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
 #include <cstring> 
+#include <iostream>
+#include <filesystem>
 
 SerialPort::SerialPort(const std::string& portName, int baudRate)
     : fd(-1), portName(portName), baudRate(baudRate) {}
@@ -238,11 +243,6 @@ std::string SerialPort::readString() {
     
     return result;
 }
-#ifndef _WIN32
-#include <iostream>
-#include <vector>
-#include <string>
-#include <filesystem>
 
 std::vector<std::string> listSerialPorts() {
     std::vector<std::string> ports;
@@ -254,6 +254,6 @@ std::vector<std::string> listSerialPorts() {
     }
     return ports;
 }
-#endif
+
 #endif
 

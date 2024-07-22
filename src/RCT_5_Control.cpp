@@ -2,9 +2,10 @@
 #include "SerialPort.h"
 #include <vector>
 #include <string>
-#include <bit>
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "imgui_stdlib.h"
+#include <imfilebrowser.h>
 
 #include "ImGuiINI.hpp"
 #define MINI_CASE_SENSITIVE
@@ -34,6 +35,7 @@ static std::string statusMessage = "No serial port connected";
 static size_t selectedCommandIndex = -1;
 static int font_index = 0;
 static int style_index = 0;
+static uint16_t timeline_index = -1;
 
 static ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_Reorderable & ImGuiTabBarFlags_NoCloseWithMiddleMouseButton;
 static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoNav;
@@ -43,7 +45,6 @@ void RCT_5_Control::checkAvailablePorts()
 {
     availablePorts = listSerialPorts();
 }
-
 void RCT_5_Control::connectPort()
 {
     if (selectedPortIndex > availablePorts.size())
@@ -68,7 +69,6 @@ void RCT_5_Control::connectPort()
         connected = false;
     }
 }
-
 void RCT_5_Control::get_device_name()
 {
     device = "No device detected";
@@ -86,7 +86,6 @@ void RCT_5_Control::get_device_name()
         }
     }
 }
-
 float RCT_5_Control::get_numeric_value()
 {
     if (namur.responseText.size() > 0)
@@ -102,17 +101,27 @@ float RCT_5_Control::get_numeric_value()
         return 0.0f;
     }
 }
-
 void RCT_5_Control::send_signal(const std::string &command)
 {
+    std::string base_command = namur.get_base_command(command);
+    NamurCommands::CommandDetails comDetails = namur.getCommandDetails(base_command);
+
     if (serialPort && connected)
     {
         if (serialPort->sendCommand(command))
         {
-            namur.responseText = serialPort->readString();
-            if (namur.responseText.size() <= 0)
+            if (comDetails.returnsValue)
             {
-                namur.responseText = "Failed to read from serial port";
+                namur.responseText = serialPort->readString();
+                if (namur.responseText.size() <= 0)
+                {
+                    namur.responseText = "Failed to read from serial port";
+                }
+                else if (base_command != "IN_NAME")
+                {
+                    float responseFloat = get_numeric_value();
+                    namur.responseText = ftos(responseFloat, 1);
+                }
             }
         }
         else
@@ -125,7 +134,6 @@ void RCT_5_Control::send_signal(const std::string &command)
         namur.responseText = "Serial port not connected";
     }
 }
-
 void RCT_5_Control::show_connection_ui(mINI::INIStructure &config)
 {
     if (ImGui::Button("Refresh Ports", ImVec2(-1, 0)))
@@ -178,13 +186,20 @@ void RCT_5_Control::show_connection_ui(mINI::INIStructure &config)
     {
         config["Settings"]["Reconnect"] = std::to_string(auto_connect);
     }
-    ImGui::TextColored(connected ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1), "Status: %s", statusMessage.c_str());
+    ImGui::Text("Status: %s", statusMessage.c_str());
     if (rct_detected)
     {
         ImGui::Text("Device: %s", device.c_str());
     }
+    if (connected && rct_detected)
+    {
+        draw_circle('g', "RCT 5 Connected");
+    }
+    else
+    {
+        draw_circle('r', "RCT 5  not connected");
+    }
 }
-
 void RCT_5_Control::show_command_ui()
 {
     if (ImGui::BeginCombo("Commands", selectedCommandIndex < namur.n ? namur.getCommandDetails(namur[selectedCommandIndex]).description.c_str() : "Select a command"))
@@ -235,7 +250,7 @@ void RCT_5_Control::show_timeline_ui(TimeLine &timeline, ImGuiIO &io)
 
     if (ImGui::Button("New Section"))
     {
-        timeline.sections.push_back(Section("Section " + std::to_string(timeline.sections.size() + 1)));
+        timeline.sections.push_back(Section("Section " + std::to_string(timeline.sections.size() + 1), &timeline));
     }
     if (timeline.sections.size() > 0)
     {
@@ -257,7 +272,7 @@ void RCT_5_Control::show_timeline_ui(TimeLine &timeline, ImGuiIO &io)
             ImGui::InputText(("##Name" + std::to_string(i)).c_str(), &timeline.sections[i].name);
             ImGui::TableNextColumn();
             ImGui::SetNextItemWidth(-FLT_MIN);
-            ImGui::InputScalar(("##Duration" + std::to_string(i)).c_str(), ImGuiDataType_U16, &timeline.sections[i].duration);
+            ImGui::InputScalar(("##Duration" + std::to_string(i)).c_str(), ImGuiDataType_U64, &timeline.sections[i].duration);
             ImGui::TableNextColumn();
             ImGui::SetNextItemWidth(-FLT_MIN);
             ImGui::InputScalar(("##TempStart" + std::to_string(i)).c_str(), ImGuiDataType_U16, &timeline.sections[i].temperature[0]);
@@ -395,6 +410,11 @@ void RCT_5_Control::show_section_ui(Section &section, ImGuiIO &io)
         ImGui::EndTable();
     }
 }
+std::string RCT_5_Control::get_response()
+{
+    return namur.responseText;
+}
+
 void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext &gl_context)
 {
     // Main loop
@@ -423,6 +443,10 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
         connectPort();
         get_device_name();
     }
+    ImGui::FileBrowser fileDialog(ImGuiFileBrowserFlags_EnterNewFilename);
+    fileDialog.SetTitle("Log File");
+    fileDialog.SetCurrentDirectory(".");
+    fileDialog.SetInputName("rct_log.txt");
 
     while (!done)
 
@@ -511,11 +535,6 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                     if (ImGui::Button("Send Signal"))
                     {
                         send_signal(namur.to_string(namur[selectedCommandIndex]));
-                        if (namur[selectedCommandIndex] != "IN_NAME" && selectedCommandIndex < namur.n && namur.getCommandDetails(namur[selectedCommandIndex]).returnsValue)
-                        {
-                            float responseFloat = get_numeric_value();
-                            namur.responseText = ftos(responseFloat, 1);
-                        }
                     }
                 }
                 // Response text box
@@ -535,13 +554,13 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                     static bool first_time = true;
                     if (first_time)
                     {
-                        ImGui::SetColumnWidth(0, ImGui::GetContentRegionAvail().x * 0.2);
+                        ImGui::SetColumnWidth(0, ImGui::GetContentRegionAvail().x * 0.3);
                         first_time = false;
                     }
                     ImGui::BeginChild("Script Editor", ImVec2(-1, -1), ImGuiChildFlags_None);
                     if (ImGui::Button("New Timeline"))
                     {
-                        timelines.push_back(TimeLine("Timeline " + std::to_string(timelines.size() + 1)));
+                        timelines.push_back(TimeLine("Timeline " + std::to_string(timelines.size() + 1), this));
                         timeline_mask = (1 << (timelines.size() - 1));
                     }
                     if (timelines.size() > 0)
@@ -621,7 +640,73 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
             }
             if (ImGui::BeginTabItem("Script Runner", NULL, ImGuiTabItemFlags_None))
             {
-                ImGui::Text("Hello, other world!");
+
+                if (connected && rct_detected)
+                {
+                    draw_circle('g', "RCT 5 Connected");
+                }
+                else
+                {
+                    show_connection_ui(ini_cfg);
+                }
+
+                if (ImGui::BeginCombo("Timelines", timeline_index < timelines.size() ? timelines[timeline_index].name.c_str() : "Select a timeline"))
+                {
+                    for (size_t i = 0; i < timelines.size(); ++i)
+                    {
+                        bool isSelected = (timeline_index == i);
+                        if (ImGui::Selectable(timelines[i].name.c_str(), isSelected))
+                        {
+                            timeline_index = i;
+                        }
+                        if (isSelected)
+                        {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+
+                if (timeline_index < timelines.size())
+                {
+                    if (ImGui::Button("Specify Log file path"))
+                        fileDialog.Open();
+                    fileDialog.Display();
+                    if (fileDialog.HasSelected())
+                    {
+                        timelines[timeline_index].logFilePath = fileDialog.GetSelected().string();
+                        fileDialog.ClearSelected();
+                    }
+                    ImGui::SameLine();
+                    ImGui::InputText("Log Path: ", &timelines[timeline_index].logFilePath);
+
+                    if (ImGui::Button("Run Script"))
+                    {
+                        if (timeline_index < timelines.size())
+                        {
+                            timelines[timeline_index].execute();
+                        }
+                    }
+                    if ( timelines[timeline_index].running)
+                    {
+                        ImGui::SameLine();
+                        if (ImGui::Button("Stop Script"))
+                        {
+                            if (timeline_index < timelines.size())
+                            {
+                                timelines[timeline_index].stop();
+                            }
+                        }
+                        ImGui::Text("Running script: %s", timelines[timeline_index].name.c_str());
+                        size_t current_section = timelines[timeline_index].current_section;
+                        ImGui::Text("Current Section: %s", timelines[timeline_index].sections[current_section].name.c_str());
+                        ImGui::PlotLines("Temperature Plate",timelines[timeline_index].logData.temperaturePlate.data(), timelines[timeline_index].logData.time.size(), 0, NULL, 0.0f, 100.0f, ImVec2(0, 80));
+                        ImGui::PlotLines("Temperature Sensor", timelines[timeline_index].logData.temperatureSensor.data(), timelines[timeline_index].logData.time.size(), 0, NULL, 0.0f, 100.0f, ImVec2(0, 80));
+                        ImGui::PlotLines("Speed", timelines[timeline_index].logData.speed.data(), timelines[timeline_index].logData.time.size(), 0, NULL, 0.0f, 1000.0f, ImVec2(0, 80));
+                        ImGui::PlotLines("Viscosity Trend", timelines[timeline_index].logData.viscosity.data(), timelines[timeline_index].logData.time.size(), 0, NULL, 0.0f, 1000.0f, ImVec2(0, 80));
+                    }
+                    
+                }
                 ImGui::EndTabItem();
             }
         }

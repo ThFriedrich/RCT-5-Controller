@@ -1,3 +1,6 @@
+#ifndef RCT_5_CONTROL_H
+#define RCT_5_CONTROL_H
+
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
@@ -14,12 +17,18 @@
 #include "ini.h"
 #include "TimeLine.h"
 
+// Forward declarations
+class Section;
+class TimeLine;
+
 class RCT_5_Control
 {
 public:
     RCT_5_Control();
     // ~RCT_5_Control();
     void render_window(SDL_Window *window,ImGuiIO &io, SDL_GLContext &gl_context);
+    void send_signal(const std::string &command);
+    std::string get_response();
     
 private:
     SerialPort *serialPort;
@@ -37,7 +46,6 @@ private:
     void checkAvailablePorts();
     void connectPort();
     void get_device_name();
-    void send_signal(const std::string &command);
     float get_numeric_value();
     void show_command_ui();
     void show_connection_ui(mINI::INIStructure &config);
@@ -46,3 +54,4 @@ private:
     std::vector<TimeLine> timelines;
     
 };
+#endif // RCT_5_CONTROL_H
