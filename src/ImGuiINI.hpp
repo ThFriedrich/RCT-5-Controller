@@ -46,8 +46,7 @@ namespace ImGuiINI
     }
 
     // Fonts
-    const char *font_names[6] = {
-        "Karla-Regular",
+    const char *font_names[5] = {
         "Roboto-Medium",
         "Cousine-Regular",
         "DroidSans",

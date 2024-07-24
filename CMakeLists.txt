@@ -76,6 +76,8 @@ target_sources( RCT_5_Control PRIVATE
     imgui/backends/imgui_impl_sdl2.cpp
     imgui/imgui_demo.cpp
     imgui/imgui.cpp
+    implot/implot.cpp
+    implot/implot_items.cpp
     src/SerialPort.cpp
     src/RCT_5_Control.cpp
     src/NamurCommands.cpp
@@ -83,12 +85,14 @@ target_sources( RCT_5_Control PRIVATE
     src/Utilities.cpp
     src/Timeline.cpp
     src/beeper.cpp
+    src/FileOperations.cpp
     )
 
 target_include_directories( RCT_5_Control PUBLIC
     imgui
     imgui/backends
     imgui/misc/cpp
+    implot
     ${SDL2_INCLUDE_DIR}
     include
     src

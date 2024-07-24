@@ -9,7 +9,14 @@ void LogData::addData(float t, float tp, float ts, float s, float v)
     speed.push_back(s);
     viscosity.push_back(v);
 }
-
+LogData::LogData() : time(), temperaturePlate(), temperatureSensor(), speed(), viscosity()
+{
+    time.reserve(256);
+    temperaturePlate.reserve(256);
+    temperatureSensor.reserve(256);
+    speed.reserve(256);
+    viscosity.reserve(256);
+}
 TimeLine::~TimeLine()
 {
     // Ensure the thread is joined on destruction
@@ -32,6 +39,8 @@ void Section::sound_beep()
 
 void TimeLine::execute()
 {
+    b_stop = false;
+    current_section = 0;
     communication_thread = new std::thread([this]
                                            { execute_thread(); });
     running = true;
@@ -39,20 +48,28 @@ void TimeLine::execute()
 
 void TimeLine::execute_thread()
 {
+    int idx = -1;
+    t_start = std::chrono::system_clock::now();
     for (Section &section : sections)
     {
+        current_section = ++idx;
         section.execute_section();
-        current_section++;
     }
+    rct->send_signal("STOP_1");
+    rct->send_signal("STOP_4");
+    running = false;
 }
 
 void TimeLine::stop()
 {
     b_stop = true;
+    rct->send_signal("STOP_1");
+    rct->send_signal("STOP_4");
     if (communication_thread != nullptr && communication_thread->joinable())
     {
         communication_thread->join();
     }
+    running = false;
 }
 void Section::compile_section()
 {
@@ -61,7 +78,7 @@ void Section::compile_section()
     // Value set interval in milliseconds
     interval = b_ramp ? 100 : duration * 1000;
     // Compute amount of steps
-    size_t steps = b_ramp ? duration * 10 : 1;
+    size_t steps = b_ramp ? duration * 10 : 2;
     // Resize vectors for temperatures and speeds
     temperatures.resize(steps);
     speeds.resize(steps);
@@ -74,6 +91,43 @@ void Section::compile_section()
         temperatures[i] = static_cast<float>(temperature[0]) + i * temperature_step;
         speeds[i] = static_cast<float>(speed[0]) + i * speed_step;
     }
+}
+void Section::handle_logging(std::ofstream &logFile, size_t ms_passed, std::chrono::time_point<std::chrono::system_clock> &t_last_log)
+{
+    logFile.open(timeline->logFilePath, std::ios::app);
+    logFile << ftos(static_cast<float>(ms_passed) / 1000, 2) << "\t\t";
+    timeline->logData.time.push_back(static_cast<float>(ms_passed) / 1000);
+    if (timeline->logSpeed)
+    {
+        timeline->rct->send_signal("IN_PV_4");
+        std::string response = timeline->rct->get_response();
+        logFile << response << "\t\t";
+        timeline->logData.speed.push_back(std::stof(response));
+    }
+    if (timeline->logTemperaturePlate)
+    {
+        timeline->rct->send_signal("IN_PV_2");
+        std::string response = timeline->rct->get_response();
+        logFile << response << "\t\t";
+        timeline->logData.temperaturePlate.push_back(std::stof(response));
+    }
+    if (timeline->logTemperatureSensor)
+    {
+        timeline->rct->send_signal("IN_PV_1");
+        std::string response = timeline->rct->get_response();
+        logFile << response << "\t\t";
+        timeline->logData.temperatureSensor.push_back(std::stof(response));
+    }
+    if (timeline->logViscosity)
+    {
+        timeline->rct->send_signal("IN_PV_5");
+        std::string response = timeline->rct->get_response();
+        logFile << response << "\t\t";
+        timeline->logData.viscosity.push_back(std::stof(response));
+    }
+    logFile << std::endl;
+    logFile.close();
+    t_last_log = std::chrono::system_clock::now();
 }
 
 void Section::execute_section()
@@ -106,7 +160,15 @@ void Section::execute_section()
             }
         }
     }
-
+    // Start the heater and motor if needed
+    if (temperature[0] != 0 || temperature[0] != 0)
+    {
+        timeline->rct->send_signal("START_1");
+    }
+    if (speed[0] != 0 || speed[0] != 0)
+    {
+        timeline->rct->send_signal("START_4");
+    }
     // Write header for log file numeric data
     if (b_log)
     {
@@ -119,11 +181,11 @@ void Section::execute_section()
         }
         if (timeline->logTemperaturePlate)
         {
-            logFile << "Temperature Plate\t\t";
+            logFile << "T Plate\t\t";
         }
         if (timeline->logTemperatureSensor)
         {
-            logFile << "Temperature Sensor\t\t";
+            logFile << "T Sensor\t\t";
         }
         if (timeline->logViscosity)
         {
@@ -133,27 +195,24 @@ void Section::execute_section()
         logFile.close();
     }
 
-    std::chrono::time_point<std::chrono::system_clock> t_start = std::chrono::system_clock::now();
     std::chrono::time_point<std::chrono::system_clock> t_now;
     std::chrono::time_point<std::chrono::system_clock> t_last_interval;
     std::chrono::time_point<std::chrono::system_clock> t_last_log;
+    std::chrono::time_point<std::chrono::system_clock> t_start_section = std::chrono::system_clock::now();
     size_t ms_duration = duration * 1000;
     size_t logInterval_ms = timeline->logInterval * 1000;
     size_t ms_passed = 0;
     size_t ms_passed_interval = 0;
     size_t ms_passed_log = 0;
+    size_t ms_passed_section = 0;
     size_t step = 0;
 
-    while (ms_passed < ms_duration)
+    while (ms_passed_section < ms_duration && !timeline->b_stop)
     {
-        if (timeline->b_stop)
-        {
-            break;
-        }
         t_now = std::chrono::system_clock::now();
-        ms_passed = std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_start).count();
+        ms_passed = std::chrono::duration_cast<std::chrono::milliseconds>(t_now - timeline->t_start).count();
         ms_passed_interval = std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_last_interval).count();
-
+        ms_passed_section = std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_start_section).count();
         if (step == 0 || ms_passed_interval >= interval)
         {
             timeline->rct->send_signal("OUT_SP_1 " + std::to_string(std::round(temperatures[step])));
@@ -165,40 +224,7 @@ void Section::execute_section()
         ms_passed_log = std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_last_log).count();
         if (b_log && ms_passed_log >= logInterval_ms)
         {
-            logFile.open(timeline->logFilePath, std::ios::app);
-            logFile << ftos(static_cast<float>(ms_passed) / 1000, 2) << "\t\t";
-            timeline->logData.time.push_back(static_cast<float>(ms_passed) / 1000);
-            if (timeline->logSpeed)
-            {
-                timeline->rct->send_signal("IN_PV_4");
-                std::string response = timeline->rct->get_response();
-                logFile <<response << "\t\t";
-                timeline->logData.speed.push_back(std::stof(response));
-            }
-            if (timeline->logTemperaturePlate)
-            {
-                timeline->rct->send_signal("IN_PV_1");
-                std::string response = timeline->rct->get_response();
-                logFile << response << "\t\t";
-                timeline->logData.temperaturePlate.push_back(std::stof(response));
-            }
-            if (timeline->logTemperatureSensor)
-            {
-                timeline->rct->send_signal("IN_PV_2");
-                std::string response = timeline->rct->get_response();
-                logFile << response << "\t\t";
-                timeline->logData.temperatureSensor.push_back(std::stof(response));
-            }
-            if (timeline->logViscosity)
-            {
-                timeline->rct->send_signal("IN_PV_5");
-                std::string response = timeline->rct->get_response();
-                logFile << response << "\t\t";
-                timeline->logData.viscosity.push_back(std::stof(response));
-            }
-            logFile << std::endl;
-            logFile.close();
-            t_last_log = std::chrono::system_clock::now();
+            handle_logging(logFile, ms_passed, t_last_log);
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -225,12 +251,18 @@ void Section::execute_section()
         {
             sound_beep();
         }
-        if (wait)
+        if (wait && !timeline->b_stop)
         {
             timeline->waiting = true;
             while (timeline->waiting)
             {
+                ms_passed_log = std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_last_log).count();
+                if (b_log && ms_passed_log >= logInterval_ms)
+                {
+                    handle_logging(logFile, ms_passed, t_last_log);
+                }
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                duration += 0.1;
             }
         }
     }

@@ -5,7 +5,9 @@
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "imgui_stdlib.h"
+#include "implot.h"
 #include <imfilebrowser.h>
+#include "FileOperations.h"
 
 #include "ImGuiINI.hpp"
 #define MINI_CASE_SENSITIVE
@@ -40,6 +42,8 @@ static uint16_t timeline_index = -1;
 static ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_Reorderable & ImGuiTabBarFlags_NoCloseWithMiddleMouseButton;
 static ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoNav;
 static ImGuiTreeNodeFlags tree_flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_SpanAvailWidth;
+static ImGui::FileBrowser fileDialog(ImGuiFileBrowserFlags_EnterNewFilename);
+static ImGui::FileBrowser fileDialogLoad;
 
 void RCT_5_Control::checkAvailablePorts()
 {
@@ -122,6 +126,10 @@ void RCT_5_Control::send_signal(const std::string &command)
                     float responseFloat = get_numeric_value();
                     namur.responseText = ftos(responseFloat, 1);
                 }
+            }
+            else
+            {
+                namur.responseText = "";
             }
         }
         else
@@ -234,9 +242,24 @@ void RCT_5_Control::show_command_ui()
 }
 void RCT_5_Control::show_timeline_ui(TimeLine &timeline, ImGuiIO &io)
 {
-    ImGui::PushFont(io.Fonts->Fonts[font_index + 6]);
+    ImGui::PushFont(io.Fonts->Fonts[font_index + 5]);
     ImGui::InputText("Name", &timeline.name);
     ImGui::PopFont();
+    ImGui::SameLine();
+    if (ImGui::Button("Save Timeline"))
+    {
+        fileDialog.SetTitle("Save Timeline");
+        fileDialog.SetTypeFilters({".tml"});
+        fileDialog.Open();
+    }
+    fileDialog.Display();
+
+    if (fileDialog.HasSelected())
+    {
+        std::string file_path = fileDialog.GetSelected().string();
+        fileDialog.ClearSelected();
+        FileOperations::saveTimeLine(timeline, file_path);
+    }
     ImGui::InputTextMultiline("Description", &timeline.description);
     ImGui::InputScalar("Log Interval", ImGuiDataType_U64, &timeline.logInterval);
 
@@ -294,7 +317,7 @@ void RCT_5_Control::show_timeline_ui(TimeLine &timeline, ImGuiIO &io)
 }
 void RCT_5_Control::show_section_ui(Section &section, ImGuiIO &io)
 {
-    ImGui::PushFont(io.Fonts->Fonts[font_index + 6]);
+    ImGui::PushFont(io.Fonts->Fonts[font_index + 5]);
     ImGui::InputText("Section", &section.name);
     ImGui::PopFont();
     ImGui::SetItemTooltip("Name of the section");
@@ -443,10 +466,9 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
         connectPort();
         get_device_name();
     }
-    ImGui::FileBrowser fileDialog(ImGuiFileBrowserFlags_EnterNewFilename);
-    fileDialog.SetTitle("Log File");
+
     fileDialog.SetCurrentDirectory(".");
-    fileDialog.SetInputName("rct_log.txt");
+    fileDialogLoad.SetCurrentDirectory(".");
 
     while (!done)
 
@@ -501,7 +523,14 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
 
             if (ImGui::BeginTabItem("Direct Interface", NULL, ImGuiTabItemFlags_None))
             {
-                show_connection_ui(ini_cfg);
+                if (connected && rct_detected)
+                {
+                    draw_circle('g', "RCT 5 Connected");
+                }
+                else
+                {
+                    draw_circle('r', "RCT 5  not connected");
+                }
                 if (ImGui::BeginCombo("Commands", selectedCommandIndex < namur.n ? namur.getCommandDetails(namur[selectedCommandIndex]).description.c_str() : "Select a command"))
                 {
                     for (size_t i = 0; i < namur.size(); ++i)
@@ -563,6 +592,24 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                         timelines.push_back(TimeLine("Timeline " + std::to_string(timelines.size() + 1), this));
                         timeline_mask = (1 << (timelines.size() - 1));
                     }
+
+                    if (ImGui::Button("Load Timeline"))
+                    {
+
+                        fileDialogLoad.SetTitle("Load Timeline");
+                        fileDialogLoad.SetTypeFilters({".tml"});
+                        fileDialogLoad.Open();
+                    }
+                    fileDialogLoad.Display();
+                    if (fileDialogLoad.HasSelected())
+                    {
+                        std::string file_path = fileDialogLoad.GetSelected().string();
+                        fileDialogLoad.ClearSelected();
+                        timelines.push_back(TimeLine(this));
+                        timeline_mask = (1 << (timelines.size() - 1));
+                        FileOperations::loadTimeLine(timelines[timelines.size() - 1], file_path);
+                    }
+
                     if (timelines.size() > 0)
                     {
                         // 'selection_mask' is dumb representation of what may be user-side selection state.
@@ -622,8 +669,6 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                     int index_tl = bitmask2index(timeline_mask);
                     int index_sec = bitmask2index(section_mask);
 
-                    // ImGui::Text("Selected Timeline Index %d", index_tl);
-                    // ImGui::Text("Selected Section Index %d", index_sec);
                     if (!last_click_section)
                     {
                         show_timeline_ui(timelines[index_tl], io);
@@ -647,7 +692,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                 }
                 else
                 {
-                    show_connection_ui(ini_cfg);
+                    draw_circle('r', "RCT 5  not connected");
                 }
 
                 if (ImGui::BeginCombo("Timelines", timeline_index < timelines.size() ? timelines[timeline_index].name.c_str() : "Select a timeline"))
@@ -669,16 +714,59 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
 
                 if (timeline_index < timelines.size())
                 {
-                    if (ImGui::Button("Specify Log file path"))
+                    if (timelines[timeline_index].waiting)
+                    {
+                        ImGui::OpenPopup("Process paused");
+                    }
+                    if (ImGui::BeginPopupModal("Process paused", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+                    {
+                        ImGui::PushFont(io.Fonts->Fonts[font_index + 5]);
+                        ImGui::SeparatorText("Waiting for confirmation to proceed");
+                        ImGui::PopFont();
+                        ImGui::Text(timelines[timeline_index].name.c_str());
+                        ImGui::Text(timelines[timeline_index].sections[timelines[timeline_index].current_section].name.c_str());
+                        if (ImGui::Button("Proceed"))
+                        {
+                            timelines[timeline_index].waiting = false;
+                            ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::SameLine();
+                        if (ImGui::Button("Cancel"))
+                        {
+                            timelines[timeline_index].waiting = false;
+                            timelines[timeline_index].stop();
+                            ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::EndPopup();
+                    }
+
+                    // Calculate the width for InputText (default width)
+                    float inputTextWidth = ImGui::CalcItemWidth();
+
+                    // Calculate the available width for the Button
+                    float labelWidth = ImGui::CalcTextSize("Log Path").x - ImGui::GetStyle().ItemInnerSpacing.x * 2;
+                    float buttonWidth = ImGui::CalcTextSize("Specify Log file path").x + ImGui::GetStyle().ItemInnerSpacing.x * 2;
+                    if (ImGui::Button("Specify Log file path", ImVec2(buttonWidth, 0)))
+                    {
+                        fileDialog.SetTitle("Specify Log file path");
+                        fileDialog.SetTypeFilters({".log", ".txt"});
                         fileDialog.Open();
+                    }
+
                     fileDialog.Display();
+
                     if (fileDialog.HasSelected())
                     {
                         timelines[timeline_index].logFilePath = fileDialog.GetSelected().string();
                         fileDialog.ClearSelected();
                     }
+
+                    // Ensure the InputText is on the same line
                     ImGui::SameLine();
-                    ImGui::InputText("Log Path: ", &timelines[timeline_index].logFilePath);
+
+                    // Create the InputText with the calculated width
+                    ImGui::SetNextItemWidth(inputTextWidth - buttonWidth);
+                    ImGui::InputText("Log Path", &timelines[timeline_index].logFilePath);
 
                     if (ImGui::Button("Run Script"))
                     {
@@ -687,25 +775,71 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                             timelines[timeline_index].execute();
                         }
                     }
-                    if ( timelines[timeline_index].running)
+                    if (timelines[timeline_index].running)
                     {
-                        ImGui::SameLine();
-                        if (ImGui::Button("Stop Script"))
+                        ImGui::Separator();
+                        ImGui::Text("Running script: %s", timelines[timeline_index].name.c_str());
+                        size_t *current_section = &timelines[timeline_index].current_section;
+                        ImGui::Text("Current Section: %s", timelines[timeline_index].sections[*current_section].name.c_str());
+                        if (timelines[timeline_index].running)
                         {
-                            if (timeline_index < timelines.size())
+                            if (ImGui::Button("Stop Script"))
                             {
                                 timelines[timeline_index].stop();
                             }
                         }
-                        ImGui::Text("Running script: %s", timelines[timeline_index].name.c_str());
-                        size_t current_section = timelines[timeline_index].current_section;
-                        ImGui::Text("Current Section: %s", timelines[timeline_index].sections[current_section].name.c_str());
-                        ImGui::PlotLines("Temperature Plate",timelines[timeline_index].logData.temperaturePlate.data(), timelines[timeline_index].logData.time.size(), 0, NULL, 0.0f, 100.0f, ImVec2(0, 80));
-                        ImGui::PlotLines("Temperature Sensor", timelines[timeline_index].logData.temperatureSensor.data(), timelines[timeline_index].logData.time.size(), 0, NULL, 0.0f, 100.0f, ImVec2(0, 80));
-                        ImGui::PlotLines("Speed", timelines[timeline_index].logData.speed.data(), timelines[timeline_index].logData.time.size(), 0, NULL, 0.0f, 1000.0f, ImVec2(0, 80));
-                        ImGui::PlotLines("Viscosity Trend", timelines[timeline_index].logData.viscosity.data(), timelines[timeline_index].logData.time.size(), 0, NULL, 0.0f, 1000.0f, ImVec2(0, 80));
                     }
-                    
+                    ImGui::Separator();
+                    if (timelines[timeline_index].logData.time.size() > 0)
+                    {
+                        if (ImGui::Button("Reset Log Data"))
+                        {
+                            timelines[timeline_index].logData.time.clear();
+                            timelines[timeline_index].logData.temperaturePlate.clear();
+                            timelines[timeline_index].logData.temperatureSensor.clear();
+                            timelines[timeline_index].logData.speed.clear();
+                            timelines[timeline_index].logData.viscosity.clear();
+                        }
+                        ImGui::Text("Log data from: %s", timelines[timeline_index].name.c_str());
+                        int n_plots = ((int)(timelines[timeline_index].logTemperaturePlate || timelines[timeline_index].logTemperatureSensor) + (int)(timelines[timeline_index].logSpeed) + (int)(timelines[timeline_index].logViscosity));
+                        size_t plot_height = (ImGui::GetContentRegionAvail().y / n_plots) - ImGui::GetStyle().ItemSpacing.y;
+                        LogData *logData = &timelines[timeline_index].logData;
+
+                        if (timelines[timeline_index].logTemperaturePlate || timelines[timeline_index].logTemperatureSensor)
+                        {
+                            if (ImPlot::BeginPlot("Temperature", ImVec2(-1, plot_height)))
+                            {
+                                ImPlot::SetupAxes("", "T [°C]", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+                                if (timelines[timeline_index].logTemperaturePlate)
+                                {
+                                ImPlot::PlotLine("Temperature Plate", logData->time.data(), logData->temperaturePlate.data(), logData->time.size());
+                                }
+                                if (timelines[timeline_index].logTemperatureSensor && v_max(logData->temperatureSensor) >= 1.0)
+                                {
+                                    ImPlot::PlotLine("Temperature Sensor", logData->time.data(), logData->temperatureSensor.data(), logData->time.size());
+                                }
+                                ImPlot::EndPlot();
+                            }
+                        }
+                        if (timelines[timeline_index].logSpeed)
+                        {
+                            if (ImPlot::BeginPlot("Stirring Speed", ImVec2(-1, plot_height)))
+                            {
+                                ImPlot::SetupAxes("", "Speed [rpm]", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+                                ImPlot::PlotLine("Speed", logData->time.data(), logData->speed.data(), logData->time.size());
+                                ImPlot::EndPlot();
+                            }
+                        }
+                        if (timelines[timeline_index].logViscosity)
+                        {
+                            if (ImPlot::BeginPlot("Viscosity trend", ImVec2(-1, plot_height)))
+                            {
+                                ImPlot::SetupAxes("Time [s]", "Viscosity [%]", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+                                ImPlot::PlotLine("Viscosity Trend", logData->time.data(), logData->viscosity.data(), logData->time.size());
+                                ImPlot::EndPlot();
+                            }
+                        }
+                    }
                 }
                 ImGui::EndTabItem();
             }

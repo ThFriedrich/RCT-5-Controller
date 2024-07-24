@@ -26,7 +26,7 @@ public:
     std::vector<float> speed;
     std::vector<float> viscosity;
 
-    LogData() : time(), temperaturePlate(), temperatureSensor(), speed(), viscosity() {}
+    LogData();
     void addData(float t, float tp, float ts, float s, float v);
 };
 
@@ -37,31 +37,33 @@ private:
     void execute_thread();
 
 public:
-    std::string name;                     // Name of the timeline
-    std::string description;              // Description of the timeline
-    std::vector<Section> sections;        // Sections of the timeline
-    size_t logInterval;                   // Interval for logging in seconds
-    bool logTemperaturePlate;             // Log temperature plate readings
-    bool logSpeed;                        // Log speed readings
-    bool logViscosity;                    // Log viscosity readings
-    bool logTemperatureSensor;            // Log temperature sensor readings
-    std::vector<std::string> logCommands; // Commands to execute for logging
-    std::thread *communication_thread;    // Thread for communication with the device
-    std::string logFilePath;              // Path of the log file
-    RCT_5_Control *rct;                   // Pointer to the RCT_5_Control object
-    bool b_stop;                          // Stop the timeline manually
-    bool waiting;                         // Waiting for user input
-    bool running;                         // Run status the timeline
-    size_t current_section;               // Current section index
-    LogData logData;                      // Log data for the timeline
-
+    std::string name;                                           // Name of the timeline
+    std::string description;                                    // Description of the timeline
+    std::vector<Section> sections;                              // Sections of the timeline
+    size_t logInterval;                                         // Interval for logging in seconds
+    bool logTemperaturePlate;                                   // Log temperature plate readings
+    bool logSpeed;                                              // Log speed readings
+    bool logViscosity;                                          // Log viscosity readings
+    bool logTemperatureSensor;                                  // Log temperature sensor readings
+    std::vector<std::string> logCommands;                       // Commands to execute for logging
+    std::thread *communication_thread;                          // Thread for communication with the device
+    std::string logFilePath;                                    // Path of the log file
+    RCT_5_Control *rct;                                         // Pointer to the RCT_5_Control object
+    bool b_stop;                                                // Stop the timeline manually
+    bool waiting;                                               // Waiting for user input
+    bool running;                                               // Run status the timeline
+    size_t current_section;                                     // Current section index
+    LogData logData;                                            // Log data for the timeline
+    std::chrono::time_point<std::chrono::system_clock> t_start; // Start time of the section
     TimeLine(std::string name, RCT_5_Control *rct) : name(name), description(), sections(),
                                                      logInterval(10), logTemperaturePlate(true), logSpeed(true),
                                                      logViscosity(true), logTemperatureSensor(true),
                                                      communication_thread(nullptr), logFilePath(),
                                                      rct(rct), b_stop(false), waiting(false), running(false),
                                                      current_section(0), logData() {}
-
+    TimeLine(RCT_5_Control *rct) : name(""), description(), sections(), logInterval(10), logTemperaturePlate(true), logSpeed(true),
+                                   logViscosity(true), logTemperatureSensor(true), communication_thread(nullptr), logFilePath(),
+                                   rct(rct), b_stop(false), waiting(false), running(false), current_section(0), logData() {}
     ~TimeLine();
     void addSection(const Section &section);
     void execute();
@@ -75,11 +77,11 @@ private:
     std::vector<float> temperatures;
     std::vector<float> speeds;
     size_t interval;
-    SerialPort *serialPort;
-    TimeLine *timeline;
+    // SerialPort *serialPort;
     void compile_section();
-
+    void handle_logging(std::ofstream &logFile, size_t ms_passed, std::chrono::time_point<std::chrono::system_clock> &t_last_log);
 public:
+    TimeLine *timeline;
     size_t duration;                              // Duration in seconds
     uint16_t temperature[2];                      // Temperature in degrees Celsius (beginning and end of the section)
     uint16_t speed[2];                            // Speed in RPM (beginning and end of the section)
@@ -90,8 +92,8 @@ public:
     std::vector<std::string> preSectionCommands;  // Commands to execute before the section
     std::vector<std::string> postSectionCommands; // Commands to execute after the section
 
-    Section(std::string name, TimeLine *timeline) : temperatures(), speeds(), duration(5), temperature{30, 30}, speed{0, 0}, name(name), description(), wait(false), b_beep(false), timeline(timeline) {}
-
+    Section(std::string name, TimeLine *timeline) : temperatures(), speeds(), duration(60), temperature{30, 30}, speed{0, 0}, name(name), description(), wait(false), b_beep(false), timeline(timeline) {}
+    Section() : temperatures(), speeds(), duration(0), temperature{0, 0}, speed{0, 0}, name(""), description(""), wait(false), b_beep(false), timeline(nullptr) {}
     void execute_section();
     void sound_beep();
 };
