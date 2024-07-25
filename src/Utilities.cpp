@@ -2,7 +2,8 @@
 #include <iomanip>
 #include <chrono>
 #include <thread>
-#include <imgui.h>
+#include "imgui.h"
+#include "imgui_stdlib.h"
 #include "Utilities.h"
 
 std::string ftos(float f, int nd)
@@ -81,4 +82,37 @@ float v_max(const std::vector<float> &v)
     {
         return *std::max_element(v.begin(), v.end());
     }
+}
+
+// Add soft returns to text for multiline text wrapping
+// from https://github.com/ocornut/imgui/issues/3237
+
+bool imgui_autosizingMultilineInput(const char* label, std::string* str, const ImVec2& sizeMin, const ImVec2& sizeMax, ImGuiInputTextFlags flags) {
+
+    // calculate the maximum y/height
+	ImGui::PushTextWrapPos(sizeMax.x);
+	auto textSize = ImGui::CalcTextSize(str->c_str());
+	if (textSize.x > sizeMax.x) {
+		float ratio = textSize.x / sizeMax.x;
+		textSize.x = sizeMax.x;
+		textSize.y *= ratio;
+		textSize.y += 20;		// add space for an extra line
+	}
+
+	textSize.y += 8;		// to compensate for inputbox margins
+
+	if (textSize.x < sizeMin.x)
+		textSize.x = sizeMin.x;
+	if (textSize.y < sizeMin.y)
+		textSize.y = sizeMin.y;
+	if (textSize.x > sizeMax.x)
+		textSize.x = sizeMax.x;
+	if (textSize.y > sizeMax.y)
+		textSize.y = sizeMax.y;
+
+	bool value_changed = ImGui::InputTextMultiline(label, str, textSize, flags);
+
+	ImGui::PopTextWrapPos();
+
+	return value_changed;
 }

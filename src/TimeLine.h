@@ -51,19 +51,20 @@ public:
     RCT_5_Control *rct;                                         // Pointer to the RCT_5_Control object
     bool b_stop;                                                // Stop the timeline manually
     bool waiting;                                               // Waiting for user input
+    bool adjusting;                                               // Waiting for user input
     bool running;                                               // Run status the timeline
     size_t current_section;                                     // Current section index
     LogData logData;                                            // Log data for the timeline
-    std::chrono::time_point<std::chrono::system_clock> t_start; // Start time of the section
+    std::chrono::time_point<std::chrono::steady_clock> t_start; // Start time of the section
     TimeLine(std::string name, RCT_5_Control *rct) : name(name), description(), sections(),
                                                      logInterval(10), logTemperaturePlate(true), logSpeed(true),
                                                      logViscosity(true), logTemperatureSensor(true),
-                                                     communication_thread(nullptr), logFilePath(),
-                                                     rct(rct), b_stop(false), waiting(false), running(false),
-                                                     current_section(0), logData() {}
+                                                     communication_thread(nullptr), logFilePath(name + ".log"),
+                                                     rct(rct), b_stop(false), waiting(false), adjusting(false), running(false),
+                                                     current_section(0), logData(), t_start() {}
     TimeLine(RCT_5_Control *rct) : name(""), description(), sections(), logInterval(10), logTemperaturePlate(true), logSpeed(true),
                                    logViscosity(true), logTemperatureSensor(true), communication_thread(nullptr), logFilePath(),
-                                   rct(rct), b_stop(false), waiting(false), running(false), current_section(0), logData() {}
+                                   rct(rct), b_stop(false), waiting(false), adjusting(false), running(false), current_section(0), logData(), t_start() {}
     ~TimeLine();
     void addSection(const Section &section);
     void execute();
@@ -79,7 +80,8 @@ private:
     size_t interval;
     // SerialPort *serialPort;
     void compile_section();
-    void handle_logging(std::ofstream &logFile, size_t ms_passed, std::chrono::time_point<std::chrono::system_clock> &t_last_log);
+    void handle_logging(std::ofstream &logFile, size_t ms_passed, std::chrono::time_point<std::chrono::steady_clock> &t_last_log);
+
 public:
     TimeLine *timeline;
     size_t duration;                              // Duration in seconds
@@ -87,13 +89,14 @@ public:
     uint16_t speed[2];                            // Speed in RPM (beginning and end of the section)
     std::string name;                             // Name of the section
     std::string description;                      // Description of the section
-    bool wait;                                    // Wait for user input before proceeding to the next section
+    bool wait_user;                               // Wait for user input before proceeding to the next section
+    bool wait_value;                              // Wait for read value to match the set value
     bool b_beep;                                  // Sound a beep at end beginning of the section
     std::vector<std::string> preSectionCommands;  // Commands to execute before the section
     std::vector<std::string> postSectionCommands; // Commands to execute after the section
 
-    Section(std::string name, TimeLine *timeline) : temperatures(), speeds(), duration(60), temperature{30, 30}, speed{0, 0}, name(name), description(), wait(false), b_beep(false), timeline(timeline) {}
-    Section() : temperatures(), speeds(), duration(0), temperature{0, 0}, speed{0, 0}, name(""), description(""), wait(false), b_beep(false), timeline(nullptr) {}
+    Section(std::string name, TimeLine *timeline) : temperatures(), speeds(), duration(60), temperature{30, 30}, speed{0, 0}, name(name), description(), wait_user(false), b_beep(false), timeline(timeline) {}
+    Section() : temperatures(), speeds(), duration(0), temperature{0, 0}, speed{0, 0}, name(""), description(""), wait_user(false), wait_value(false), b_beep(false), timeline(nullptr) {}
     void execute_section();
     void sound_beep();
 };

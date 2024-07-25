@@ -15,7 +15,8 @@ void FileOperations::saveSection(const Section& section, std::ofstream& outFile)
     outFile.write(reinterpret_cast<const char*>(section.temperature), sizeof(section.temperature));
     outFile.write(reinterpret_cast<const char*>(section.speed), sizeof(section.speed));
     
-    outFile.write(reinterpret_cast<const char*>(&section.wait), sizeof(section.wait));
+    outFile.write(reinterpret_cast<const char*>(&section.wait_user), sizeof(section.wait_user));
+    outFile.write(reinterpret_cast<const char*>(&section.wait_value), sizeof(section.wait_value));
     outFile.write(reinterpret_cast<const char*>(&section.b_beep), sizeof(section.b_beep));
     
     size_t preSectionCommandsSize = section.preSectionCommands.size();
@@ -81,7 +82,8 @@ void FileOperations::loadSection(Section& section, std::ifstream& inFile) {
     inFile.read(reinterpret_cast<char*>(section.temperature), sizeof(section.temperature));
     inFile.read(reinterpret_cast<char*>(section.speed), sizeof(section.speed));
     
-    inFile.read(reinterpret_cast<char*>(&section.wait), sizeof(section.wait));
+    inFile.read(reinterpret_cast<char*>(&section.wait_user), sizeof(section.wait_user));
+    inFile.read(reinterpret_cast<char*>(&section.wait_value), sizeof(section.wait_value));
     inFile.read(reinterpret_cast<char*>(&section.b_beep), sizeof(section.b_beep));
     
     size_t preSectionCommandsSize;
@@ -141,6 +143,7 @@ void FileOperations::loadTimeLine(TimeLine& timeline, const std::string& filenam
     timeline.current_section = 0;
     timeline.running = false;
     timeline.waiting = false;
+    timeline.adjusting = false;
     timeline.b_stop = false;
     timeline.logData = LogData();
 }

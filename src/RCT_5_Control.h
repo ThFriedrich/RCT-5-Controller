@@ -4,6 +4,7 @@
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
+#include <chrono>
 #include <stdio.h>
 #include <SDL.h>
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -17,7 +18,6 @@
 #include "ini.h"
 #include "TimeLine.h"
 
-
 // Forward declarations
 class Section;
 class TimeLine;
@@ -30,6 +30,7 @@ public:
     void render_window(SDL_Window *window,ImGuiIO &io, SDL_GLContext &gl_context);
     void send_signal(const std::string &command);
     std::string get_response();
+    float get_numeric_value();
     
 private:
     SerialPort *serialPort;
@@ -47,12 +48,12 @@ private:
     void checkAvailablePorts();
     void connectPort();
     void get_device_name();
-    float get_numeric_value();
     void show_command_ui();
     void show_connection_ui(mINI::INIStructure &config);
     void show_timeline_ui(TimeLine &timeline, ImGuiIO &io);
     void show_section_ui(Section &section, ImGuiIO &io);
     std::vector<TimeLine> timelines;
+    void save_timeline_ui(TimeLine &timeline);
     
 };
 #endif // RCT_5_CONTROL_H

@@ -34,6 +34,7 @@ RCT_5_Control::RCT_5_Control()
 }
 
 static std::string statusMessage = "No serial port connected";
+static std::string status_txt = "";
 static size_t selectedCommandIndex = -1;
 static int font_index = 0;
 static int style_index = 0;
@@ -242,25 +243,12 @@ void RCT_5_Control::show_command_ui()
 }
 void RCT_5_Control::show_timeline_ui(TimeLine &timeline, ImGuiIO &io)
 {
+    ImGui::SeparatorText("Timeline Parameters");
     ImGui::PushFont(io.Fonts->Fonts[font_index + 5]);
     ImGui::InputText("Name", &timeline.name);
     ImGui::PopFont();
-    ImGui::SameLine();
-    if (ImGui::Button("Save Timeline"))
-    {
-        fileDialog.SetTitle("Save Timeline");
-        fileDialog.SetTypeFilters({".tml"});
-        fileDialog.Open();
-    }
-    fileDialog.Display();
-
-    if (fileDialog.HasSelected())
-    {
-        std::string file_path = fileDialog.GetSelected().string();
-        fileDialog.ClearSelected();
-        FileOperations::saveTimeLine(timeline, file_path);
-    }
-    ImGui::InputTextMultiline("Description", &timeline.description);
+    imgui_autosizingMultilineInput("Description", &timeline.description, ImVec2(ImGui::CalcItemWidth(), ImGui::GetTextLineHeight() * 2), ImVec2(ImGui::CalcItemWidth(), ImGui::GetTextLineHeight() * 8));
+    
     ImGui::InputScalar("Log Interval", ImGuiDataType_U64, &timeline.logInterval);
 
     ImGui::Checkbox("Log Temperature (Plate)", &timeline.logTemperaturePlate);
@@ -271,20 +259,23 @@ void RCT_5_Control::show_timeline_ui(TimeLine &timeline, ImGuiIO &io)
     ImGui::SameLine();
     ImGui::Checkbox("Log Viscosity Trend", &timeline.logViscosity);
 
-    if (ImGui::Button("New Section"))
+    ImGui::SeparatorText("Sections");
+    if (ImGui::Button("New Section", ImVec2(-1, 0)))
     {
         timeline.sections.push_back(Section("Section " + std::to_string(timeline.sections.size() + 1), &timeline));
     }
     if (timeline.sections.size() > 0)
     {
-        ImGui::BeginTable("Sections", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable, ImVec2(-1, -1));
+        auto available_height = ImGui::GetContentRegionAvail().y - ImGui::GetItemRectSize().y - ImGui::GetStyle().ItemSpacing.y;
+        ImGui::BeginTable("Sections", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable, ImVec2(-1, available_height));
         ImGui::TableSetupColumn("Name");
         ImGui::TableSetupColumn("Duration");
         ImGui::TableSetupColumn("Temperature Start");
         ImGui::TableSetupColumn("Temperature End");
         ImGui::TableSetupColumn("Speed Start");
         ImGui::TableSetupColumn("Speed End");
-        ImGui::TableSetupColumn("Wait");
+        ImGui::TableSetupColumn("Wait (User)");
+        ImGui::TableSetupColumn("Wait (Value)");
         ImGui::TableHeadersRow();
 
         for (size_t i = 0; i < timeline.sections.size(); i++)
@@ -310,18 +301,31 @@ void RCT_5_Control::show_timeline_ui(TimeLine &timeline, ImGuiIO &io)
             ImGui::InputScalar(("##SpeedEnd" + std::to_string(i)).c_str(), ImGuiDataType_U16, &timeline.sections[i].speed[1]);
             ImGui::TableNextColumn();
             ImGui::SetNextItemWidth(-FLT_MIN);
-            ImGui::Checkbox(("##Wait" + std::to_string(i)).c_str(), &timeline.sections[i].wait);
+            ImGui::Checkbox(("##Wait(User)" + std::to_string(i)).c_str(), &timeline.sections[i].wait_user);
+            ImGui::TableNextColumn();
+            ImGui::SetNextItemWidth(-FLT_MIN);
+            ImGui::Checkbox(("##Wait(Value)" + std::to_string(i)).c_str(), &timeline.sections[i].wait_value);
         }
         ImGui::EndTable();
     }
+    if (ImGui::Button("Save Timeline", ImVec2(-1, 0)))
+    {
+        fileDialog.Open();
+        fileDialog.SetTitle("Save Timeline");
+        fileDialog.SetTypeFilters({".tml"});
+        fileDialog.SetInputName(timeline.name + ".tml");
+    }
+    save_timeline_ui(timeline);
 }
 void RCT_5_Control::show_section_ui(Section &section, ImGuiIO &io)
 {
+    ImGui::SeparatorText("Section Parameters");
     ImGui::PushFont(io.Fonts->Fonts[font_index + 5]);
     ImGui::InputText("Section", &section.name);
     ImGui::PopFont();
     ImGui::SetItemTooltip("Name of the section");
-    ImGui::InputTextMultiline("Description", &section.description);
+     imgui_autosizingMultilineInput("Description", &section.description, ImVec2(ImGui::CalcItemWidth(), ImGui::GetTextLineHeight() * 2), ImVec2(ImGui::CalcItemWidth(), ImGui::GetTextLineHeight() * 8));
+    // ImGui::InputTextMultiline("Description", &section.description);
     ImGui::SetItemTooltip("Description of the section");
     ImGui::InputScalar("Duration", ImGuiDataType_U64, &section.duration);
     ImGui::SetItemTooltip("Duration in seconds");
@@ -333,26 +337,30 @@ void RCT_5_Control::show_section_ui(Section &section, ImGuiIO &io)
     ImGui::SetItemTooltip("Rotation speed at the beginning of the section in RPM");
     ImGui::InputScalar("Speed End", ImGuiDataType_U16, &section.speed[1]);
     ImGui::SetItemTooltip("Rotation speed at the end of the section in RPM");
+    ImGui::Checkbox("Wait (User)", &section.wait_user);
     ImGui::SetItemTooltip("Wait for user input before proceeding to the next section");
-    ImGui::Checkbox("Wait", &section.wait);
-    ImGui::SetItemTooltip("Sound a beep at the end of the section");
+    ImGui::SameLine();
+    ImGui::Checkbox("Wait (value)", &section.wait_value);
+    ImGui::SetItemTooltip("Wait for the actual values to match target values before proceeding to the next section");
+    ImGui::SameLine();
     ImGui::Checkbox("Beep on completion", &section.b_beep);
-
-    if (ImGui::Button("Add Pre-Section Command"))
+    ImGui::SetItemTooltip("Sound a beep at the end of the section");
+    ImGui::SeparatorText("Pre- and Post-Section Commands");
+    show_command_ui();
+    float available_width = (ImGui::GetContentRegionAvail().x / 2 - ImGui::GetStyle().ItemSpacing.x);
+    if (ImGui::Button("Add as pre-Section Command", ImVec2(available_width, 0)))
     {
         if (selectedCommandIndex < namur.n)
             section.preSectionCommands.push_back(namur.to_string(namur[selectedCommandIndex]));
     }
     ImGui::SetItemTooltip("Commands to execute before the section");
     ImGui::SameLine();
-    if (ImGui::Button("Add Post-Section Command"))
+    if (ImGui::Button("Add as post-Section Command", ImVec2(available_width, 0)))
     {
         if (selectedCommandIndex < namur.n)
             section.postSectionCommands.push_back(namur.to_string(namur[selectedCommandIndex]));
     }
     ImGui::SetItemTooltip("Commands to execute after the section");
-
-    show_command_ui();
 
     if (section.preSectionCommands.size() > 0)
     {
@@ -437,7 +445,23 @@ std::string RCT_5_Control::get_response()
 {
     return namur.responseText;
 }
+void RCT_5_Control::save_timeline_ui(TimeLine &timeline)
+{
+    fileDialog.SetTitle("Save Timeline");
+    fileDialog.SetTypeFilters({".tml"});
+    fileDialog.Display();
+    if (fileDialog.HasSelected())
+    {
+        std::string file_path = fileDialog.GetSelected().string();
+        fileDialog.ClearSelected();
 
+        if (file_path.find(".tml") == std::string::npos)
+        {
+            file_path += ".tml";
+        }
+        FileOperations::saveTimeLine(timeline, file_path);
+    }
+}
 void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext &gl_context)
 {
     // Main loop
@@ -508,8 +532,8 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                 show_connection_ui(ini_cfg);
                 ImGui::EndMenu();
             }
+            ImGui::EndMainMenuBar();
         }
-        ImGui::EndMainMenuBar();
 
         // Make the window use the entire work area
         ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -518,9 +542,365 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
         // Main Window with Tab environment
         ImGui::Begin("RCT 5 Interface", NULL, window_flags);
 
-        if (ImGui::BeginTabBar("TabBar1", tab_bar_flags))
+        if (ImGui::BeginTabBar("MainTabBar", tab_bar_flags))
         {
+            if (ImGui::BeginTabItem("Script Editor", NULL, ImGuiTabItemFlags_None))
+            {
+                // Tree view for timelines and sections
+                static int timeline_mask = (1 << 0);
+                static int section_mask = (1 << 0);
+                int timeline_clicked = -1;
+                int section_clicked = -1;
+                static bool last_click_section = true; // true if last click was on a section
+                ImGui::BeginColumns("columns", 2);
+                {
+                    static bool first_time = true;
+                    if (first_time)
+                    {
+                        ImGui::SetColumnWidth(0, ImGui::GetContentRegionAvail().x * 0.3);
+                        first_time = false;
+                    }
+                    ImGui::BeginChild("Script Editor", ImVec2(-1, -1), ImGuiChildFlags_None);
+                    if (ImGui::Button("New Timeline", ImVec2(-1, 0)))
+                    {
+                        timelines.push_back(TimeLine("Timeline " + std::to_string(timelines.size() + 1), this));
+                        timeline_mask = (1 << (timelines.size() - 1));
+                    }
 
+                    if (ImGui::Button("Load Timeline", ImVec2(-1, 0)))
+                    {
+
+                        fileDialogLoad.SetTitle("Load Timeline");
+                        fileDialogLoad.SetTypeFilters({".tml"});
+                        fileDialogLoad.Open();
+                    }
+                    fileDialogLoad.Display();
+                    if (fileDialogLoad.HasSelected())
+                    {
+                        std::string file_path = fileDialogLoad.GetSelected().string();
+                        fileDialogLoad.ClearSelected();
+                        timelines.push_back(TimeLine(this));
+                        timeline_mask = (1 << (timelines.size() - 1));
+                        FileOperations::loadTimeLine(timelines[timelines.size() - 1], file_path);
+                    }
+
+                    if (timelines.size() > 0)
+                    {
+                        // 'selection_mask' is dumb representation of what may be user-side selection state.
+                        //  You may retain selection state inside or outside your objects in whatever format you see fit.
+                        // 'node_clicked' is temporary storage of what node we have clicked to process selection at the end
+                        /// of the loop. May be a pointer to your own node type, etc.
+
+                        for (size_t i = 0; i < timelines.size(); i++)
+                        {
+                            // Disable the default "open on single-click behavior" + set Selected flag according to our selection.
+                            // To alter selection we use IsItemClicked() && !IsItemToggledOpen(), so clicking on an arrow doesn't alter selection.
+                            ImGuiTreeNodeFlags tl_node_flags = tree_flags;
+                            const bool tl_is_selected = (timeline_mask & (1 << i)) != 0;
+                            if (tl_is_selected)
+                                tl_node_flags |= ImGuiTreeNodeFlags_DefaultOpen; // ImGuiTreeNodeFlags_Selected
+
+                            bool node_open = ImGui::TreeNodeEx((void*)(intptr_t)i, tl_node_flags, timelines[i].name.c_str());
+                            if (ImGui::IsItemHovered())
+                            {
+                                if (ImGui::IsMouseDown(ImGuiMouseButton_Left) || ImGui::IsMouseDown(ImGuiMouseButton_Right))
+                                {
+                                    timeline_clicked = i;
+                                    last_click_section = false;
+                                }
+                            }
+
+                            if (node_open)
+                            {
+                                for (size_t j = 0; j < timelines[i].sections.size(); j++)
+                                {
+                                    ImGuiTreeNodeFlags sec_node_flags = tree_flags;
+                                    const bool se_is_selected = (section_mask & (1 << j)) != 0;
+                                    if (se_is_selected && tl_is_selected && last_click_section)
+                                        sec_node_flags |= ImGuiTreeNodeFlags_Selected;
+                                    sec_node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+                                    ImGui::TreeNodeEx((void*)(intptr_t)(i*128+j), sec_node_flags, timelines[i].sections[j].name.c_str());
+                                    if (ImGui::IsItemHovered())
+                                    {
+                                        if (ImGui::IsMouseDown(ImGuiMouseButton_Left) || ImGui::IsMouseDown(ImGuiMouseButton_Right))
+                                        {
+                                            timeline_clicked = i;
+                                            section_clicked = j;
+                                            last_click_section = true;
+                                        }
+                                        if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
+                                        {
+                                            ImGui::OpenPopup("delete_section");
+                                        }
+                                    }
+                                }
+                                if (section_clicked != -1)
+                                {
+                                    // Update selection state
+                                    section_mask = (1 << section_clicked); // Click to single-select
+                                }
+                                ImGui::TreePop();
+                            }
+                        }
+                        if (timeline_clicked != -1)
+                        {
+                            // Update selection state
+                            timeline_mask = (1 << timeline_clicked); // Click to single-select
+                        }
+                    }
+                    int index_tl = bitmask2index(timeline_mask);
+                    int index_sec = bitmask2index(section_mask);
+
+                    if (ImGui::BeginPopupContextWindow("delete_section"))
+                    {
+                        ImGui::BeginPopupContextItem("Section modifiers");
+                        if (last_click_section)
+                        {
+                            if (ImGui::MenuItem("Delete Section"))
+                            {
+                                timelines[index_tl].sections.erase(timelines[index_tl].sections.begin() + index_sec);
+                                ImGui::CloseCurrentPopup();
+                                index_sec = -1;
+                            }
+                            if (ImGui::MenuItem("Move Section up"))
+                            {
+                                if (index_sec > 0)
+                                {
+                                    std::swap(timelines[index_tl].sections[index_sec], timelines[index_tl].sections[index_sec - 1]);
+                                }
+                                ImGui::CloseCurrentPopup();
+                            }
+                            if (ImGui::MenuItem("Move Section down"))
+                            {
+                                if (index_sec < timelines[index_tl].sections.size() - 1)
+                                {
+                                    std::swap(timelines[index_tl].sections[index_sec], timelines[index_tl].sections[index_sec + 1]);
+                                }
+                                ImGui::CloseCurrentPopup();
+                            }
+                        }
+                        else
+                        {
+                            if (ImGui::MenuItem("Delete Timeline"))
+                            {
+                                timelines.erase(timelines.begin() + index_tl);
+                                ImGui::CloseCurrentPopup();
+                                index_tl = -1;
+                            }
+                            if (ImGui::MenuItem("Add Section"))
+                            {
+                                timelines[index_tl].sections.push_back(Section("Section " + std::to_string(timelines[index_tl].sections.size() + 1), &timelines[index_tl]));
+                                index_sec = timelines[index_tl].sections.size() - 1;
+                            }
+                            if (ImGui::MenuItem("Save Timeline"))
+                            {
+                                fileDialog.SetInputName(timelines[index_tl].name + ".tml");
+                                fileDialog.Open();
+                            }
+                        }
+                        ImGui::EndPopup();
+                    }
+                    ImGui::EndChild();
+                    ImGui::NextColumn();
+                    if (timelines.size() > index_tl)
+                    {
+                        if (!last_click_section)
+                        {
+                            show_timeline_ui(timelines[index_tl], io);
+                        }
+                        else if (timelines.size() > 0 && timelines[index_tl].sections.size() > index_sec && index_sec > -1)
+                        {
+                            save_timeline_ui(timelines[index_tl]);
+                            show_section_ui(timelines[index_tl].sections[index_sec], io);
+                        }
+                    }
+                    ImGui::EndColumns();
+                }
+
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Script Runner", NULL, ImGuiTabItemFlags_None))
+            {
+
+                if (connected && rct_detected)
+                {
+                    draw_circle('g', "RCT 5 Connected");
+                }
+                else
+                {
+                    draw_circle('r', "RCT 5  not connected");
+                }
+
+                if (ImGui::BeginCombo("Timelines", timeline_index < timelines.size() ? timelines[timeline_index].name.c_str() : "Select a timeline"))
+                {
+                    for (size_t i = 0; i < timelines.size(); ++i)
+                    {
+                        bool isSelected = (timeline_index == i);
+                        if (ImGui::Selectable(timelines[i].name.c_str(), isSelected))
+                        {
+                            timeline_index = i;
+                        }
+                        if (isSelected)
+                        {
+                            ImGui::SetItemDefaultFocus();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+
+                if (timeline_index < timelines.size())
+                {
+                    if (timelines[timeline_index].waiting)
+                    {
+                        ImGui::OpenPopup("Process paused");
+                    }
+                    if (ImGui::BeginPopupModal("Process paused", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+                    {
+                        std::string message = "Waiting for confirmation to proceed";
+                        if (timelines[timeline_index].adjusting)
+                        {
+                            message = "Adjusting values to match target values";
+                        }
+
+                        ImGui::PushFont(io.Fonts->Fonts[font_index + 5]);
+                        ImGui::SeparatorText(message.c_str());
+                        ImGui::PopFont();
+                        ImGui::Text(timelines[timeline_index].name.c_str());
+                        ImGui::Text(timelines[timeline_index].sections[timelines[timeline_index].current_section].name.c_str());
+                        if (!timelines[timeline_index].adjusting)
+                        {
+                            if (ImGui::Button("Proceed"))
+                            {
+                                timelines[timeline_index].waiting = false;
+                                ImGui::CloseCurrentPopup();
+                            }
+                            ImGui::SameLine();
+                        }
+                        if (ImGui::Button("Cancel"))
+                        {
+                            timelines[timeline_index].waiting = false;
+                            timelines[timeline_index].stop();
+                            ImGui::CloseCurrentPopup();
+                        }
+
+                        ImGui::EndPopup();
+                    }
+
+                    // Calculate the width for InputText (default width)
+                    float inputTextWidth = ImGui::CalcItemWidth();
+
+                    // Calculate the available width for the Button
+                    float labelWidth = ImGui::CalcTextSize("Log Path").x - ImGui::GetStyle().ItemInnerSpacing.x * 2;
+                    float buttonWidth = ImGui::CalcTextSize("Specify Log file path").x + ImGui::GetStyle().ItemInnerSpacing.x * 2;
+                    if (ImGui::Button("Specify Log file path", ImVec2(buttonWidth, 0)))
+                    {
+                        fileDialog.Open();
+                        fileDialog.SetTitle("Specify Log file path");
+                        fileDialog.SetTypeFilters({".log", ".txt"});
+                        fileDialog.SetInputName(timelines[timeline_index].name + ".log");
+                    }
+
+                    fileDialog.Display();
+
+                    if (fileDialog.HasSelected())
+                    {
+                        timelines[timeline_index].logFilePath = fileDialog.GetSelected().string();
+                        fileDialog.ClearSelected();
+                    }
+
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(inputTextWidth - buttonWidth);
+                    ImGui::InputText("Log Path", &timelines[timeline_index].logFilePath);
+
+                    if (timelines[timeline_index].running)
+                    {
+                        ImGui::SeparatorText("Status");
+                        size_t *current_section = &timelines[timeline_index].current_section;
+                        std::chrono::duration<float> time_elapsed = std::chrono::steady_clock::now() - timelines[timeline_index].t_start;
+                        std::string time_elapsed_str = std::to_string(std::chrono::duration_cast<std::chrono::seconds>(time_elapsed).count());
+                        status_txt = "Running: " + timelines[timeline_index].name + "   |   Section: " + timelines[timeline_index].sections[*current_section].name + "   |   Time elapsed: " + time_elapsed_str + " s   |   ";
+                        ImGui::Text(status_txt.c_str());
+                        ImGui::SameLine();
+                        if (ImGui::Button("Stop Script", ImVec2(-1, 0)))
+                        {
+                            timelines[timeline_index].stop();
+                        }
+                    }
+                    else
+                    {
+                        if (connected && rct_detected)
+                        {
+                            if (ImGui::Button("Run Script"))
+                            {
+                                if (timeline_index < timelines.size())
+                                {
+                                    timelines[timeline_index].execute();
+                                }
+                            }
+                        }
+                        else
+                        {
+                            ImGui::Text("Connect RCT 5 to run script");
+                        }
+                    }
+                    if (timelines[timeline_index].logData.time.size() > 0)
+                    {
+                        ImGui::SeparatorText("Logging");
+                        ImGui::Text("Log of: %s ", timelines[timeline_index].name.c_str());
+                        ImGui::SameLine(ImGui::CalcTextSize(status_txt.c_str()).x + ImGui::GetStyle().ItemSpacing.x * 2);
+                        if (ImGui::Button("Reset Log Data", ImVec2(-1, 0)))
+                        {
+                            timelines[timeline_index].logData.time.clear();
+                            timelines[timeline_index].logData.temperaturePlate.clear();
+                            timelines[timeline_index].logData.temperatureSensor.clear();
+                            timelines[timeline_index].logData.speed.clear();
+                            timelines[timeline_index].logData.viscosity.clear();
+                        }
+                        int n_plots = ((int)(timelines[timeline_index].logTemperaturePlate || timelines[timeline_index].logTemperatureSensor) + (int)(timelines[timeline_index].logSpeed) + (int)(timelines[timeline_index].logViscosity));
+                        size_t plot_height = (ImGui::GetContentRegionAvail().y / n_plots) - ImGui::GetStyle().ItemSpacing.y;
+                        LogData *logData = &timelines[timeline_index].logData;
+
+                        if (logData->time.size() > 0)
+                        {
+                            if (timelines[timeline_index].logTemperaturePlate || timelines[timeline_index].logTemperatureSensor)
+                            {
+                                if (ImPlot::BeginPlot("Temperature", ImVec2(-1, plot_height)))
+                                {
+                                    ImPlot::SetupAxes("", "T [°C]", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+                                    if (timelines[timeline_index].logTemperaturePlate)
+                                    {
+                                        ImPlot::PlotLine("Temperature Plate", logData->time.data(), logData->temperaturePlate.data(), logData->time.size());
+                                    }
+                                    if (timelines[timeline_index].logTemperatureSensor && v_max(logData->temperatureSensor) >= 1.0)
+                                    {
+                                        ImPlot::PlotLine("Temperature Sensor", logData->time.data(), logData->temperatureSensor.data(), logData->time.size());
+                                    }
+                                    ImPlot::EndPlot();
+                                }
+                            }
+                            if (timelines[timeline_index].logSpeed)
+                            {
+                                if (ImPlot::BeginPlot("Stirring Speed", ImVec2(-1, plot_height)))
+                                {
+                                    ImPlot::SetupAxes("", "Speed [rpm]", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+                                    ImPlot::PlotLine("Speed", logData->time.data(), logData->speed.data(), logData->time.size());
+                                    ImPlot::EndPlot();
+                                }
+                            }
+                            if (timelines[timeline_index].logViscosity)
+                            {
+                                if (ImPlot::BeginPlot("Viscosity trend", ImVec2(-1, plot_height)))
+                                {
+                                    ImPlot::SetupAxes("Time [s]", "Viscosity [%]", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+                                    ImPlot::PlotLine("Viscosity Trend", logData->time.data(), logData->viscosity.data(), logData->time.size());
+                                    ImPlot::EndPlot();
+                                }
+                            }
+                        }
+                    }
+                }
+                ImGui::EndTabItem();
+            }
             if (ImGui::BeginTabItem("Direct Interface", NULL, ImGuiTabItemFlags_None))
             {
                 if (connected && rct_detected)
@@ -568,279 +948,6 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                 }
                 // Response text box
                 ImGui::InputText("Response", &namur.responseText, ImGuiInputTextFlags_ReadOnly);
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem("Script Editor", NULL, ImGuiTabItemFlags_None))
-            {
-                // Tree view for timelines and sections
-                static int timeline_mask = (1 << 0);
-                static int section_mask = (1 << 0);
-                int timeline_clicked = -1;
-                int section_clicked = -1;
-                static bool last_click_section = true; // true if last click was on a section
-                ImGui::BeginColumns("columns", 2);
-                {
-                    static bool first_time = true;
-                    if (first_time)
-                    {
-                        ImGui::SetColumnWidth(0, ImGui::GetContentRegionAvail().x * 0.3);
-                        first_time = false;
-                    }
-                    ImGui::BeginChild("Script Editor", ImVec2(-1, -1), ImGuiChildFlags_None);
-                    if (ImGui::Button("New Timeline"))
-                    {
-                        timelines.push_back(TimeLine("Timeline " + std::to_string(timelines.size() + 1), this));
-                        timeline_mask = (1 << (timelines.size() - 1));
-                    }
-
-                    if (ImGui::Button("Load Timeline"))
-                    {
-
-                        fileDialogLoad.SetTitle("Load Timeline");
-                        fileDialogLoad.SetTypeFilters({".tml"});
-                        fileDialogLoad.Open();
-                    }
-                    fileDialogLoad.Display();
-                    if (fileDialogLoad.HasSelected())
-                    {
-                        std::string file_path = fileDialogLoad.GetSelected().string();
-                        fileDialogLoad.ClearSelected();
-                        timelines.push_back(TimeLine(this));
-                        timeline_mask = (1 << (timelines.size() - 1));
-                        FileOperations::loadTimeLine(timelines[timelines.size() - 1], file_path);
-                    }
-
-                    if (timelines.size() > 0)
-                    {
-                        // 'selection_mask' is dumb representation of what may be user-side selection state.
-                        //  You may retain selection state inside or outside your objects in whatever format you see fit.
-                        // 'node_clicked' is temporary storage of what node we have clicked to process selection at the end
-                        /// of the loop. May be a pointer to your own node type, etc.
-
-                        for (size_t i = 0; i < timelines.size(); i++)
-                        {
-                            // Disable the default "open on single-click behavior" + set Selected flag according to our selection.
-                            // To alter selection we use IsItemClicked() && !IsItemToggledOpen(), so clicking on an arrow doesn't alter selection.
-                            ImGuiTreeNodeFlags tl_node_flags = tree_flags;
-                            const bool tl_is_selected = (timeline_mask & (1 << i)) != 0;
-                            if (tl_is_selected)
-                                tl_node_flags |= ImGuiTreeNodeFlags_Selected;
-
-                            bool node_open = ImGui::TreeNodeEx(timelines[i].name.c_str(), tl_node_flags, timelines[i].name.c_str());
-                            if (ImGui::IsItemClicked())
-                            {
-                                timeline_clicked = i;
-                                last_click_section = false;
-                            }
-
-                            if (node_open)
-                            {
-                                for (size_t j = 0; j < timelines[i].sections.size(); j++)
-                                {
-                                    ImGuiTreeNodeFlags sec_node_flags = tree_flags;
-                                    const bool se_is_selected = (section_mask & (1 << j)) != 0;
-                                    if (se_is_selected && tl_is_selected && last_click_section)
-                                        sec_node_flags |= ImGuiTreeNodeFlags_Selected;
-                                    sec_node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-                                    ImGui::TreeNodeEx(timelines[i].sections[j].name.c_str(), sec_node_flags, timelines[i].sections[j].name.c_str());
-                                    if (ImGui::IsItemClicked())
-                                    {
-                                        section_clicked = j;
-                                        timeline_clicked = i;
-                                        last_click_section = true;
-                                    }
-                                }
-                                if (section_clicked != -1)
-                                {
-                                    // Update selection state
-                                    section_mask = (1 << section_clicked); // Click to single-select
-                                }
-                                ImGui::TreePop();
-                            }
-                        }
-                        if (timeline_clicked != -1)
-                        {
-                            // Update selection state
-                            timeline_mask = (1 << timeline_clicked); // Click to single-select
-                        }
-                    }
-                    ImGui::EndChild();
-                    ImGui::NextColumn();
-                    int index_tl = bitmask2index(timeline_mask);
-                    int index_sec = bitmask2index(section_mask);
-
-                    if (!last_click_section)
-                    {
-                        show_timeline_ui(timelines[index_tl], io);
-                    }
-                    else if (timelines.size() > 0 && timelines[index_tl].sections.size() > 0)
-                    {
-                        show_section_ui(timelines[index_tl].sections[index_sec], io);
-                    }
-
-                    ImGui::EndColumns();
-                }
-
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem("Script Runner", NULL, ImGuiTabItemFlags_None))
-            {
-
-                if (connected && rct_detected)
-                {
-                    draw_circle('g', "RCT 5 Connected");
-                }
-                else
-                {
-                    draw_circle('r', "RCT 5  not connected");
-                }
-
-                if (ImGui::BeginCombo("Timelines", timeline_index < timelines.size() ? timelines[timeline_index].name.c_str() : "Select a timeline"))
-                {
-                    for (size_t i = 0; i < timelines.size(); ++i)
-                    {
-                        bool isSelected = (timeline_index == i);
-                        if (ImGui::Selectable(timelines[i].name.c_str(), isSelected))
-                        {
-                            timeline_index = i;
-                        }
-                        if (isSelected)
-                        {
-                            ImGui::SetItemDefaultFocus();
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
-
-                if (timeline_index < timelines.size())
-                {
-                    if (timelines[timeline_index].waiting)
-                    {
-                        ImGui::OpenPopup("Process paused");
-                    }
-                    if (ImGui::BeginPopupModal("Process paused", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-                    {
-                        ImGui::PushFont(io.Fonts->Fonts[font_index + 5]);
-                        ImGui::SeparatorText("Waiting for confirmation to proceed");
-                        ImGui::PopFont();
-                        ImGui::Text(timelines[timeline_index].name.c_str());
-                        ImGui::Text(timelines[timeline_index].sections[timelines[timeline_index].current_section].name.c_str());
-                        if (ImGui::Button("Proceed"))
-                        {
-                            timelines[timeline_index].waiting = false;
-                            ImGui::CloseCurrentPopup();
-                        }
-                        ImGui::SameLine();
-                        if (ImGui::Button("Cancel"))
-                        {
-                            timelines[timeline_index].waiting = false;
-                            timelines[timeline_index].stop();
-                            ImGui::CloseCurrentPopup();
-                        }
-                        ImGui::EndPopup();
-                    }
-
-                    // Calculate the width for InputText (default width)
-                    float inputTextWidth = ImGui::CalcItemWidth();
-
-                    // Calculate the available width for the Button
-                    float labelWidth = ImGui::CalcTextSize("Log Path").x - ImGui::GetStyle().ItemInnerSpacing.x * 2;
-                    float buttonWidth = ImGui::CalcTextSize("Specify Log file path").x + ImGui::GetStyle().ItemInnerSpacing.x * 2;
-                    if (ImGui::Button("Specify Log file path", ImVec2(buttonWidth, 0)))
-                    {
-                        fileDialog.SetTitle("Specify Log file path");
-                        fileDialog.SetTypeFilters({".log", ".txt"});
-                        fileDialog.Open();
-                    }
-
-                    fileDialog.Display();
-
-                    if (fileDialog.HasSelected())
-                    {
-                        timelines[timeline_index].logFilePath = fileDialog.GetSelected().string();
-                        fileDialog.ClearSelected();
-                    }
-
-                    // Ensure the InputText is on the same line
-                    ImGui::SameLine();
-
-                    // Create the InputText with the calculated width
-                    ImGui::SetNextItemWidth(inputTextWidth - buttonWidth);
-                    ImGui::InputText("Log Path", &timelines[timeline_index].logFilePath);
-
-                    if (ImGui::Button("Run Script"))
-                    {
-                        if (timeline_index < timelines.size())
-                        {
-                            timelines[timeline_index].execute();
-                        }
-                    }
-                    if (timelines[timeline_index].running)
-                    {
-                        ImGui::Separator();
-                        ImGui::Text("Running script: %s", timelines[timeline_index].name.c_str());
-                        size_t *current_section = &timelines[timeline_index].current_section;
-                        ImGui::Text("Current Section: %s", timelines[timeline_index].sections[*current_section].name.c_str());
-                        if (timelines[timeline_index].running)
-                        {
-                            if (ImGui::Button("Stop Script"))
-                            {
-                                timelines[timeline_index].stop();
-                            }
-                        }
-                    }
-                    ImGui::Separator();
-                    if (timelines[timeline_index].logData.time.size() > 0)
-                    {
-                        if (ImGui::Button("Reset Log Data"))
-                        {
-                            timelines[timeline_index].logData.time.clear();
-                            timelines[timeline_index].logData.temperaturePlate.clear();
-                            timelines[timeline_index].logData.temperatureSensor.clear();
-                            timelines[timeline_index].logData.speed.clear();
-                            timelines[timeline_index].logData.viscosity.clear();
-                        }
-                        ImGui::Text("Log data from: %s", timelines[timeline_index].name.c_str());
-                        int n_plots = ((int)(timelines[timeline_index].logTemperaturePlate || timelines[timeline_index].logTemperatureSensor) + (int)(timelines[timeline_index].logSpeed) + (int)(timelines[timeline_index].logViscosity));
-                        size_t plot_height = (ImGui::GetContentRegionAvail().y / n_plots) - ImGui::GetStyle().ItemSpacing.y;
-                        LogData *logData = &timelines[timeline_index].logData;
-
-                        if (timelines[timeline_index].logTemperaturePlate || timelines[timeline_index].logTemperatureSensor)
-                        {
-                            if (ImPlot::BeginPlot("Temperature", ImVec2(-1, plot_height)))
-                            {
-                                ImPlot::SetupAxes("", "T [°C]", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
-                                if (timelines[timeline_index].logTemperaturePlate)
-                                {
-                                ImPlot::PlotLine("Temperature Plate", logData->time.data(), logData->temperaturePlate.data(), logData->time.size());
-                                }
-                                if (timelines[timeline_index].logTemperatureSensor && v_max(logData->temperatureSensor) >= 1.0)
-                                {
-                                    ImPlot::PlotLine("Temperature Sensor", logData->time.data(), logData->temperatureSensor.data(), logData->time.size());
-                                }
-                                ImPlot::EndPlot();
-                            }
-                        }
-                        if (timelines[timeline_index].logSpeed)
-                        {
-                            if (ImPlot::BeginPlot("Stirring Speed", ImVec2(-1, plot_height)))
-                            {
-                                ImPlot::SetupAxes("", "Speed [rpm]", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
-                                ImPlot::PlotLine("Speed", logData->time.data(), logData->speed.data(), logData->time.size());
-                                ImPlot::EndPlot();
-                            }
-                        }
-                        if (timelines[timeline_index].logViscosity)
-                        {
-                            if (ImPlot::BeginPlot("Viscosity trend", ImVec2(-1, plot_height)))
-                            {
-                                ImPlot::SetupAxes("Time [s]", "Viscosity [%]", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
-                                ImPlot::PlotLine("Viscosity Trend", logData->time.data(), logData->viscosity.data(), logData->time.size());
-                                ImPlot::EndPlot();
-                            }
-                        }
-                    }
-                }
                 ImGui::EndTabItem();
             }
         }
