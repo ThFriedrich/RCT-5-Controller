@@ -7,25 +7,29 @@
 #include <windows.h>
 
 // Windows implementation
-SerialPort::SerialPort(const std::string& portName, int baudRate)
+SerialPort::SerialPort(const std::string &portName, int baudRate)
     : handle(nullptr), portName(portName), baudRate(baudRate) {}
 
-SerialPort::~SerialPort() {
+SerialPort::~SerialPort()
+{
     close();
 }
 
-bool SerialPort::open() {
+bool SerialPort::open()
+{
     DCB dcb;
     COMMTIMEOUTS ct;
 
     handle = CreateFileA(portName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (handle == INVALID_HANDLE_VALUE) {
+    if (handle == INVALID_HANDLE_VALUE)
+    {
         std::cerr << "Error opening serial port" << std::endl;
         return false;
     }
 
     dcb.DCBlength = sizeof(dcb);
-    if (!GetCommState(handle, &dcb)) {
+    if (!GetCommState(handle, &dcb))
+    {
         std::cerr << "Error getting serial port state" << std::endl;
         close();
         return false;
@@ -36,69 +40,81 @@ bool SerialPort::open() {
     dcb.StopBits = ONESTOPBIT;
     dcb.Parity = NOPARITY;
 
-    if (!SetCommState(handle, &dcb)) {
+    if (!SetCommState(handle, &dcb))
+    {
         std::cerr << "Error setting serial port state" << std::endl;
         close();
         return false;
     }
 
     GetCommTimeouts(handle, &ct);
-    ct.ReadIntervalTimeout         = 100;
-    ct.ReadTotalTimeoutMultiplier  = 0;  
-    ct.ReadTotalTimeoutConstant    = 100; 
+    ct.ReadIntervalTimeout = 100;
+    ct.ReadTotalTimeoutMultiplier = 0;
+    ct.ReadTotalTimeoutConstant = 100;
     ct.WriteTotalTimeoutMultiplier = 0;
-    ct.WriteTotalTimeoutConstant   = 100;
-	SetCommTimeouts(handle, &ct);
+    ct.WriteTotalTimeoutConstant = 100;
+    SetCommTimeouts(handle, &ct);
 
     return true;
 }
 
-void SerialPort::close() {
-    if (handle != nullptr) {
+void SerialPort::close()
+{
+    if (handle != nullptr)
+    {
         CloseHandle(handle);
         handle = nullptr;
     }
 }
 
-bool SerialPort::sendCommand(const std::string& command) {
+bool SerialPort::sendCommand(const std::string &command)
+{
     std::string upperCommand = command;
     std::transform(upperCommand.begin(), upperCommand.end(), upperCommand.begin(), ::toupper);
     upperCommand += " \r\n";
-    
+
     DWORD bytes_written;
-    if (!WriteFile(handle, upperCommand.c_str(), upperCommand.size(), &bytes_written, NULL)) {
+    if (!WriteFile(handle, upperCommand.c_str(), upperCommand.size(), &bytes_written, NULL))
+    {
         std::cerr << "Error writing to serial port" << std::endl;
         return false;
     }
-    
+
     return true;
 }
 
-std::string SerialPort::readString() {
+std::string SerialPort::readString()
+{
     std::string result;
     char buffer;
     unsigned long bytes_read;
-    
-    while (true) {
-        if (!ReadFile(handle, &buffer, 1, &bytes_read, NULL)) {
+
+    while (true)
+    {
+        if (!ReadFile(handle, &buffer, 1, &bytes_read, NULL))
+        {
             std::cerr << "Error reading from serial port" << std::endl;
             return result;
         }
-        if (bytes_read == 0) {
+        if (bytes_read == 0)
+        {
             break;
         }
-        if (buffer == '\n') {
+        if (buffer == '\n')
+        {
             break;
         }
         result += buffer;
     }
-    
+
     return result;
 }
 
-bool SerialPort::readBytes(unsigned char* buffer) {
+bool SerialPort::readBytes(unsigned char *buffer)
+{
     unsigned long bytes_read;
-    if (!ReadFile(handle, buffer, 1, &bytes_read, NULL)) {
+    if (!ReadFile(handle, buffer, 1, &bytes_read, NULL))
+    {
         std::cerr << "Error reading from serial port" << std::endl;
         return false;
     }
@@ -108,7 +124,7 @@ bool SerialPort::readBytes(unsigned char* buffer) {
 std::vector<std::string> listSerialPorts()
 {
     char lpTargetPath[5000]; // buffer to store the path of the COMPORTS
-    bool gotPort = false; // in case the port is not found
+    bool gotPort = false;    // in case the port is not found
 
     std::vector<std::string> ports;
 
@@ -118,10 +134,10 @@ std::vector<std::string> listSerialPorts()
         unsigned long test = QueryDosDeviceA(str.c_str(), lpTargetPath, 5000);
 
         // Test the return value and error if any
-        if (test  != 0) //QueryDosDevice returns zero if it didn't find an object
+        if (test != 0) // QueryDosDevice returns zero if it didn't find an object
         {
             ports.push_back(str);
-            //std::cout << str << ": " << lpTargetPath << std::endl;
+            // std::cout << str << ": " << lpTargetPath << std::endl;
         }
         if (::GetLastError() == ERROR_INSUFFICIENT_BUFFER)
         {
@@ -135,120 +151,164 @@ std::vector<std::string> listSerialPorts()
 #include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
-#include <cstring> 
+#include <cstring>
 #include <iostream>
 #include <filesystem>
 
-SerialPort::SerialPort(const std::string& portName, int baudRate)
-    : fd(-1), portName(portName), baudRate(baudRate) {}
+SerialPort::SerialPort(const std::string &portName, int baudRate)
+    : portName(portName), baudRate(baudRate), handle(-1) {}
 
-SerialPort::~SerialPort() {
+SerialPort::~SerialPort()
+{
     close();
 }
 
-bool SerialPort::open() {
-    fd = ::open(portName.c_str(), O_RDWR);
-    if (fd < 0) {
-        printf("Error %i from open: %s\n", errno, strerror(errno));
+bool SerialPort::open()
+{
+    int handle = ::open(portName.c_str(), O_RDWR | O_NOCTTY | O_NDELAY);
+    if (handle == -1)
+    {
         std::cerr << "Error opening serial port" << std::endl;
         return false;
     }
 
     struct termios tty;
-    if (tcgetattr(fd, &tty) != 0) {
-        std::cerr << "Error getting tty attributes" << std::endl;
-        printf("Error %i from open: %s\n", errno, strerror(errno));
-        close();
+    if (tcgetattr(handle, &tty) != 0)
+    {
+        std::cerr << "Error getting terminal attributes" << std::endl;
+        ::close(handle);
         return false;
     }
 
-    tty.c_cflag &= ~PARENB;
-    tty.c_cflag &= ~CSTOPB;
-    tty.c_cflag &= ~CSIZE;
-    tty.c_cflag |= CS8;
-    tty.c_cflag |= CREAD | CLOCAL;
-
+    // Set baud rate
     cfsetispeed(&tty, baudRate);
     cfsetospeed(&tty, baudRate);
 
-    tty.c_cc[VTIME] = 10;
-    tty.c_cc[VMIN] = 0;
+    // Set 8N1 (8 data bits, no parity, 1 stop bit)
+    tty.c_cflag &= ~PARENB; // No parity
+    tty.c_cflag &= ~CSTOPB; // One stop bit
+    tty.c_cflag &= ~CSIZE;
+    tty.c_cflag |= CS8; // 8 data bits
 
-    if (tcsetattr(fd, TCSANOW, &tty) != 0) {
-        std::cerr << "Error setting tty attributes" << std::endl;
-        close();
+    // Set non-canonical mode
+    tty.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+    tty.c_iflag &= ~(IXON | IXOFF | IXANY);
+    tty.c_oflag &= ~OPOST;
+
+    // Set timeouts
+    tty.c_cc[VMIN] = 0;   // Non-blocking read
+    tty.c_cc[VTIME] = 100; // 1 second read timeout
+
+    // Apply the settings
+    if (tcsetattr(handle, TCSANOW, &tty) != 0)
+    {
+        std::cerr << "Error setting terminal attributes" << std::endl;
+        ::close(handle);
         return false;
     }
 
+    // Flush the input and output buffers
+    // if (tcflush(handle, TCIOFLUSH) != 0) {
+    //     std::cerr << "Error flushing buffers: " << strerror(errno) << std::endl;
+    //     ::close(handle);
+    //     return false;
+    // }
+
+    // Store the handle for later use
+    this->handle = handle;
     return true;
 }
 
-void SerialPort::close() {
-    if (fd >= 0) {
-        ::close(fd);
-        fd = -1;
+void SerialPort::close()
+{
+    if (handle >= 0)
+    {
+        ::close(handle);
+        handle = -1;
     }
 }
 
-bool SerialPort::sendByte(unsigned char byte) {
-    if (write(fd, &byte, 1) != 1) {
-        printf("Error %i from open: %s\n", errno, strerror(errno));
+bool SerialPort::sendByte(unsigned char byte)
+{
+    if (write(handle, &byte, 1) != 1)
+    {
+        printf("Error %i from sendByte: %s\n", errno, strerror(errno));
         return false;
     }
     return true;
 }
 
-bool SerialPort::readBytes(unsigned char* buffer) {
-    int num_bytes = read(fd, buffer, 1);
-    if (num_bytes < 0) {
-        printf("Error %i from open: %s\n", errno, strerror(errno));
+bool SerialPort::readBytes(unsigned char *buffer)
+{
+    int num_bytes = read(handle, buffer, 1);
+    if (num_bytes < 0)
+    {
+        printf("Error %i from readBytes: %s\n", errno, strerror(errno));
         return false;
     }
     return true;
 }
 
-bool SerialPort::sendCommand(const std::string& command) {
+bool SerialPort::sendCommand(const std::string &command)
+{
     std::string upperCommand = command;
     std::transform(upperCommand.begin(), upperCommand.end(), upperCommand.begin(), ::toupper);
     upperCommand += " \r\n";
-    
-    ssize_t bytes_written = write(fd, upperCommand.c_str(), upperCommand.size());
-    if (bytes_written < 0) {
-        std::cerr << "Error writing to serial port" << std::endl;
+
+    ssize_t bytes_written = write(handle, upperCommand.c_str(), upperCommand.size());
+    if (bytes_written < 0)
+    {
+        printf("Error %i from sendCommand: %s\n", errno, strerror(errno));
         return false;
     }
-    
+
     return true;
 }
 
 std::string SerialPort::readString() {
-    std::string result;
-    char buffer;
-    ssize_t bytes_read;
-    
-    while (true) {
-        bytes_read = read(fd, &buffer, 1);
-        if (bytes_read < 0) {
-            std::cerr << "Error reading from serial port" << std::endl;
-            return result;
-        }
-        if (bytes_read == 0) {
-            break;
-        }
-        if (buffer == '\n') {
-            break;
-        }
-        result += buffer;
+    if (handle == -1) {
+        std::cerr << "Serial port not open" << std::endl;
+        return "";
     }
-    
+
+    char buffer[256];
+    std::string result;
+    int bytesRead;
+
+    while (true) {
+        bytesRead = ::read(handle, buffer, sizeof(buffer) - 1);
+        if (bytesRead > 0) {
+            buffer[bytesRead] = '\0';
+            result += buffer;
+            if (result.find('\n') != std::string::npos) {
+                break;
+            }
+        } else if (bytesRead == -1) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // No data available, continue reading
+                usleep(1000); // Sleep for 1ms
+                continue;
+            } else {
+                std::cerr << "Error reading from serial port: " << strerror(errno) << std::endl;
+                break;
+            }
+        } else {
+            // No more data
+            break;
+        }
+    }
+
     return result;
 }
 
-std::vector<std::string> listSerialPorts() {
+std::vector<std::string> listSerialPorts()
+{
     std::vector<std::string> ports;
-    for (const auto& entry : std::filesystem::directory_iterator("/dev/")) {
-        const std::string& path = entry.path().string();
-        if (path.find("ttyUSB") != std::string::npos || path.find("ttyS") != std::string::npos || path.find("ttyACM") != std::string::npos) {
+    for (const auto &entry : std::filesystem::directory_iterator("/dev/"))
+    {
+        const std::string &path = entry.path().string();
+        if (path.find("ttyUSB") != std::string::npos || path.find("ttyS") != std::string::npos || path.find("ttyACM") != std::string::npos)
+        {
             ports.push_back(path);
         }
     }
@@ -256,4 +316,3 @@ std::vector<std::string> listSerialPorts() {
 }
 
 #endif
-

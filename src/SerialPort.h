@@ -5,6 +5,11 @@
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
+#define PORT_HANDLE void *
+#else
+#define PORT_HANDLE int
+#endif
 class SerialPort
 {
 public:
@@ -18,17 +23,13 @@ public:
     bool readBytes(unsigned char *buffer);
     std::string readString();
 
-    int baudRate;
     std::string portName;
+    int baudRate;
     void checkAvailablePorts();
     std::vector<std::string> availablePorts;
 
 private:
-#ifdef _WIN32
-    void *handle;
-#else
-    int fd;
-#endif
+    PORT_HANDLE handle;
 };
 std::vector<std::string> listSerialPorts();
 #endif // SERIALPORT_H
