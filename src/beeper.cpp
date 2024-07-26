@@ -239,6 +239,13 @@ void Beeper::play_note(float note, uint32_t interval, bool staccato, float time_
     }
 }
 
+void Beeper::play_pause(uint32_t interval)
+{
+    setVolume(0.0);
+    sleep(interval);
+    setVolume(1.0);
+}
+
 void Beeper::super_mario_level_finshed(float speed)
 // Play super mario bros winner theme
 {
@@ -277,6 +284,67 @@ void Beeper::super_mario_level_finshed(float speed)
     play_note(ais6, i8, true, speed);
     play_note(c6, i2p, false, speed);
 
+    stop();
+    close();
+}
+
+void Beeper::super_mario_level_theme(float speed)
+// Play super mario bros theme
+{
+    open();
+    setVolume(1.0);
+    play();
+
+    play_note(c4, i4p, false, speed);
+    play_note(g3, i4p, false, speed);
+    play_note(e2, i4, false, speed);
+    play_pause(i8);
+    play_note(a3, i4, false, speed);
+    play_note(b3, i4, false, speed);
+    play_note(ais3, i8, false, speed);
+    play_note(a3, i4, false, speed);
+
+    play_note(g3, i8, false, speed);
+    play_note(g3, i32, false, speed);
+    play_note(e4, i8, false, speed);
+    play_note(e4, i32, false, speed);
+    play_note(g4, i8, false, speed);
+    play_note(g4, i32, false, speed);
+    
+    play_note(a5, i4, false, speed);
+    play_note(f4, i8, false, speed);
+    play_note(g4, i8, false, speed);
+    play_pause(i8);
+
+    play_note(e4, i4, false, speed);
+    play_note(c4, i8, false, speed);
+    play_note(d4, i8, false, speed);
+    play_note(b3, i4p, false, speed);
+
+    play_note(c4, i4p, false, speed);
+    play_note(g3, i4p, false, speed);
+    play_note(e2, i4, false, speed);
+    play_pause(i8);
+    play_note(a3, i4, false, speed);
+    play_note(b3, i4, false, speed);
+    play_note(ais3, i8, false, speed);
+    play_note(a3, i4, false, speed);
+
+    play_note(g3, i8, false, speed);
+    play_note(g3, i32, false, speed);
+    play_note(e4, i8, false, speed);
+    play_note(e4, i32, false, speed);
+    play_note(g4, i8, false, speed);
+    play_note(g4, i32, false, speed);
+    play_note(a5, i4, false, speed);
+    play_note(f4, i8, false, speed);
+    play_note(g4, i8, false, speed);
+    play_pause(i8);
+    play_note(e4, i4, false, speed);
+    play_note(c4, i8, false, speed);
+    play_note(d4, i8, false, speed);
+    play_note(b3, i4p, false, speed);
+    
     stop();
     close();
 }

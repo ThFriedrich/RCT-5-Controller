@@ -31,7 +31,9 @@ public:
     static void play();
     static void stop();
     static void play_note(float note, uint32_t interval, bool staccato = false, float time_factor = 1.0);
+    static void play_pause(uint32_t interval);
     static void super_mario_level_finshed(float speed = 1.0);
+    static void super_mario_level_theme(float speed = 1.0);
 
     static SDL_AudioSpec m_obtainedSpec;
 
@@ -64,6 +66,28 @@ private:
     );
 
     // Note frequencies
+    static constexpr float a2 = 110.00;
+    static constexpr float ais2 = 116.54;
+    static constexpr float b2 = 123.47;
+    static constexpr float c2 = 130.81;
+    static constexpr float cis2 = 138.59;
+    static constexpr float d2 = 146.83;
+    static constexpr float dis2 = 155.56;
+    static constexpr float e2 = 164.81;
+    static constexpr float f2 = 174.61;
+    static constexpr float fis2 = 185.00;
+    static constexpr float g2 = 196.00;
+    static constexpr float gis2 = 207.65;
+    static constexpr float a3 = 220.00;
+    static constexpr float ais3 = 233.08;
+    static constexpr float b3 = 246.94;
+    static constexpr float c3 = 261.63;
+    static constexpr float cis3 = 277.18;
+    static constexpr float d3 = 293.66;
+    static constexpr float dis3 = 311.13;
+    static constexpr float e3 = 329.63;
+    static constexpr float f3 = 349.23;
+    static constexpr float fis3 = 369.99;
     static constexpr float g3 = 196.00;
     static constexpr float gis3 = 207.65;
     static constexpr float a4 = 220.00;
