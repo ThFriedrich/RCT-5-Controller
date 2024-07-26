@@ -672,7 +672,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                             }
                             if (ImGui::MenuItem("Move Section down"))
                             {
-                                if (index_sec < timelines[index_tl].sections.size() - 1)
+                                if (index_sec < (int)timelines[index_tl].sections.size() - 1)
                                 {
                                     std::swap(timelines[index_tl].sections[index_sec], timelines[index_tl].sections[index_sec + 1]);
                                 }
@@ -702,13 +702,13 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                     }
                     ImGui::EndChild();
                     ImGui::NextColumn();
-                    if (timelines.size() > index_tl)
+                    if ((int)timelines.size() > index_tl && index_tl >= 0)
                     {
                         if (!last_click_section)
                         {
                             show_timeline_ui(timelines[index_tl], io);
                         }
-                        else if (timelines.size() > 0 && timelines[index_tl].sections.size() > index_sec && index_sec > -1)
+                        else if (timelines.size() > 0 && (int)timelines[index_tl].sections.size() > index_sec && index_sec > -1)
                         {
                             save_timeline_ui(timelines[index_tl]);
                             show_section_ui(timelines[index_tl].sections[index_sec], io);
@@ -721,7 +721,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
             }
             if (ImGui::BeginTabItem("Script Runner", NULL, ImGuiTabItemFlags_None))
             {
-
+                
                 if (connected && rct_detected)
                 {
                     draw_circle('g', "RCT 5 Connected");
@@ -790,7 +790,6 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                     float inputTextWidth = ImGui::CalcItemWidth();
 
                     // Calculate the available width for the Button
-                    float labelWidth = ImGui::CalcTextSize("Log Path").x - ImGui::GetStyle().ItemInnerSpacing.x * 2;
                     float buttonWidth = ImGui::CalcTextSize("Specify Log file path").x + ImGui::GetStyle().ItemInnerSpacing.x * 2;
                     if (ImGui::Button("Specify Log file path", ImVec2(buttonWidth, 0)))
                     {

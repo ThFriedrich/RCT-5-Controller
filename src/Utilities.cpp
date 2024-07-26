@@ -55,7 +55,7 @@ void draw_circle(const char color, const char *label)
     draw_list->AddCircleFilled(ImVec2(p1.x + h / 2, p1.y + h / 2), 5.0f, ImGuiCol);
     ImGui::Dummy(ImVec2(h, h));
     ImGui::SameLine();
-    ImGui::Text(label);
+    ImGui::Text("%s", label);
 }
 
 float v_min(const std::vector<float> &v)

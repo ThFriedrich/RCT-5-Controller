@@ -95,8 +95,8 @@ public:
     std::vector<std::string> preSectionCommands;  // Commands to execute before the section
     std::vector<std::string> postSectionCommands; // Commands to execute after the section
 
-    Section(std::string name, TimeLine *timeline) : temperatures(), speeds(), duration(60), temperature{30, 30}, speed{0, 0}, name(name), description(), wait_user(false), b_beep(false), timeline(timeline) {}
-    Section() : temperatures(), speeds(), duration(0), temperature{0, 0}, speed{0, 0}, name(""), description(""), wait_user(false), wait_value(false), b_beep(false), timeline(nullptr) {}
+    Section(std::string name, TimeLine *timeline) : temperatures(), speeds(), timeline(timeline), duration(60), temperature{30, 30}, speed{0, 0}, name(name), description(), wait_user(false), wait_value(false), b_beep(false) {}
+    Section() : temperatures(), speeds(), timeline(nullptr) , duration(0), temperature{0, 0}, speed{0, 0}, name(""), description(""), wait_user(false), wait_value(false), b_beep(false){}
     void execute_section();
     void sound_beep();
 };
