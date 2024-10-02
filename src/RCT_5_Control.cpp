@@ -484,9 +484,10 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer*
     ImGuiINI::check_ini_setting(ini_cfg, "Settings", "COM-Port", selectedPortIndex);
     ImGuiINI::check_ini_setting(ini_cfg, "Settings", "Baud-Rate", selectedBaudRateIndex);
     ImGuiINI::check_ini_setting(ini_cfg, "Settings", "Reconnect", auto_connect);
-
-    if (auto_connect)
+    static bool connected_on_startup = false;
+    if (auto_connect && !connected_on_startup)
     {
+        connected_on_startup = true;
         connectPort();
         get_device_name();
     }
@@ -754,7 +755,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer*
                     {
                         ImGui::OpenPopup("Process paused");
                     }
-                    if (ImGui::BeginPopupModal("Process paused", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+                    if (ImGui::BeginPopupModal("Process paused", &timelines[timeline_index].waiting, ImGuiWindowFlags_AlwaysAutoResize))
                     {
                         std::string message = "Waiting for confirmation to proceed";
                         std::string btn_text = "Proceed";
