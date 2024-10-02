@@ -248,7 +248,7 @@ void RCT_5_Control::show_timeline_ui(TimeLine &timeline, ImGuiIO &io)
     ImGui::InputText("Name", &timeline.name);
     ImGui::PopFont();
     imgui_autosizingMultilineInput("Description", &timeline.description, ImVec2(ImGui::CalcItemWidth(), ImGui::GetTextLineHeight() * 2), ImVec2(ImGui::CalcItemWidth(), ImGui::GetTextLineHeight() * 8));
-    
+
     ImGui::InputScalar("Log Interval", ImGuiDataType_U64, &timeline.logInterval);
 
     ImGui::Checkbox("Log Temperature (Plate)", &timeline.logTemperaturePlate);
@@ -324,7 +324,7 @@ void RCT_5_Control::show_section_ui(Section &section, ImGuiIO &io)
     ImGui::InputText("Section", &section.name);
     ImGui::PopFont();
     ImGui::SetItemTooltip("Name of the section");
-     imgui_autosizingMultilineInput("Description", &section.description, ImVec2(ImGui::CalcItemWidth(), ImGui::GetTextLineHeight() * 2), ImVec2(ImGui::CalcItemWidth(), ImGui::GetTextLineHeight() * 8));
+    imgui_autosizingMultilineInput("Description", &section.description, ImVec2(ImGui::CalcItemWidth(), ImGui::GetTextLineHeight() * 2), ImVec2(ImGui::CalcItemWidth(), ImGui::GetTextLineHeight() * 8));
     // ImGui::InputTextMultiline("Description", &section.description);
     ImGui::SetItemTooltip("Description of the section");
     ImGui::InputScalar("Duration", ImGuiDataType_U64, &section.duration);
@@ -462,7 +462,7 @@ void RCT_5_Control::save_timeline_ui(TimeLine &timeline)
         FileOperations::saveTimeLine(timeline, file_path);
     }
 }
-void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext &gl_context)
+void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer* renderer)
 {
     // Main loop
     bool done = false;
@@ -509,7 +509,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
         }
 
         // Start the Dear ImGui frame
-        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
@@ -600,7 +600,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                             if (tl_is_selected)
                                 tl_node_flags |= ImGuiTreeNodeFlags_DefaultOpen; // ImGuiTreeNodeFlags_Selected
 
-                            bool node_open = ImGui::TreeNodeEx((void*)(intptr_t)i, tl_node_flags, timelines[i].name.c_str());
+                            bool node_open = ImGui::TreeNodeEx((void *)(intptr_t)i, tl_node_flags, timelines[i].name.c_str());
                             if (ImGui::IsItemHovered())
                             {
                                 if (ImGui::IsMouseDown(ImGuiMouseButton_Left) || ImGui::IsMouseDown(ImGuiMouseButton_Right))
@@ -619,7 +619,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                                     if (se_is_selected && tl_is_selected && last_click_section)
                                         sec_node_flags |= ImGuiTreeNodeFlags_Selected;
                                     sec_node_flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
-                                    ImGui::TreeNodeEx((void*)(intptr_t)(i*128+j), sec_node_flags, timelines[i].sections[j].name.c_str());
+                                    ImGui::TreeNodeEx((void *)(intptr_t)(i * 128 + j), sec_node_flags, timelines[i].sections[j].name.c_str());
                                     if (ImGui::IsItemHovered())
                                     {
                                         if (ImGui::IsMouseDown(ImGuiMouseButton_Left) || ImGui::IsMouseDown(ImGuiMouseButton_Right))
@@ -721,7 +721,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
             }
             if (ImGui::BeginTabItem("Script Runner", NULL, ImGuiTabItemFlags_None))
             {
-                
+
                 if (connected && rct_detected)
                 {
                     draw_circle('g', "RCT 5 Connected");
@@ -757,9 +757,11 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                     if (ImGui::BeginPopupModal("Process paused", NULL, ImGuiWindowFlags_AlwaysAutoResize))
                     {
                         std::string message = "Waiting for confirmation to proceed";
+                        std::string btn_text = "Proceed";
                         if (timelines[timeline_index].adjusting)
                         {
                             message = "Adjusting values to match target values";
+                            btn_text = "Skip adjustment";
                         }
 
                         ImGui::PushFont(io.Fonts->Fonts[font_index + 5]);
@@ -767,22 +769,21 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
                         ImGui::PopFont();
                         ImGui::Text(timelines[timeline_index].name.c_str());
                         ImGui::Text(timelines[timeline_index].sections[timelines[timeline_index].current_section].name.c_str());
-                        if (!timelines[timeline_index].adjusting)
+
+                        if (ImGui::Button(btn_text.c_str()))
                         {
-                            if (ImGui::Button("Proceed"))
-                            {
-                                timelines[timeline_index].waiting = false;
-                                ImGui::CloseCurrentPopup();
-                            }
-                            ImGui::SameLine();
+                            timelines[timeline_index].adjusting = false;
+                            timelines[timeline_index].waiting = false;
+                            ImGui::CloseCurrentPopup();
                         }
+                        ImGui::SameLine();
                         if (ImGui::Button("Cancel"))
                         {
+                            timelines[timeline_index].adjusting = false;
                             timelines[timeline_index].waiting = false;
                             timelines[timeline_index].stop();
                             ImGui::CloseCurrentPopup();
                         }
-
                         ImGui::EndPopup();
                     }
 
@@ -956,19 +957,21 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_GLContext
 
         // Rendering
         ImGui::Render();
+        SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
+        SDL_RenderClear(renderer);
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
+        SDL_RenderPresent(renderer);
 
-        glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-        glClear(GL_COLOR_BUFFER_BIT);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        SDL_GL_SwapWindow(window);
     }
 
     // Cleanup
-    ImGui_ImplOpenGL3_Shutdown();
+    // ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDLRenderer2_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
 
-    SDL_GL_DeleteContext(gl_context);
+    // SDL_GL_DeleteContext(gl_context);
+    SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
 

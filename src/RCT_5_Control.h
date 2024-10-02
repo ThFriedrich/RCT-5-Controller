@@ -3,15 +3,11 @@
 
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
-#include "imgui_impl_opengl3.h"
+#include "imgui_impl_sdlrenderer2.h"
 #include <chrono>
 #include <stdio.h>
 #include <SDL.h>
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <SDL_opengles2.h>
-#else
-#include <SDL_opengl.h>
-#endif
+
 #include "NamurCommands.h"
 #include "SerialPort.h" // Include the appropriate header file for SerialPort
 #define MINI_CASE_SENSITIVE
@@ -27,7 +23,7 @@ class RCT_5_Control
 public:
     RCT_5_Control();
     // ~RCT_5_Control();
-    void render_window(SDL_Window *window,ImGuiIO &io, SDL_GLContext &gl_context);
+    void render_window(SDL_Window *window,ImGuiIO &io, SDL_Renderer* renderer);
     void send_signal(const std::string &command);
     std::string get_response();
     float get_numeric_value();
