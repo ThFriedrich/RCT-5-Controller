@@ -33,8 +33,16 @@ void TimeLine::addSection(const Section &section)
 
 void Section::sound_beep()
 {
-    std::thread t1 = std::thread(Beeper::super_mario_level_finshed, 0.75);
-    t1.detach();
+    if (timeline->current_section == timeline->sections.size() - 1)
+    {
+        std::thread t1 = std::thread(Beeper::super_mario_level_finshed, 0.75);
+        t1.detach();
+    }
+    else
+    {
+        std::thread t1 = std::thread(Beeper::super_mario_level_theme, 1.0);
+        t1.detach();
+    }
 }
 
 void TimeLine::execute()
@@ -49,6 +57,18 @@ void TimeLine::execute()
 void TimeLine::execute_thread()
 {
     int idx = -1;
+    if (!logFilePath.empty())
+    {
+        std::chrono::time_point<std::chrono::system_clock> current_date_time = std::chrono::system_clock::now();
+        std::time_t time = std::chrono::system_clock::to_time_t(current_date_time);
+        std::ofstream logFile;
+        logFile.open(logFilePath, std::ios::app);
+        logFile << "TimeLine: " << name << std::endl;
+        logFile << "Start time: " << std::ctime(&time) << std::endl;
+        logFile << std::endl
+                << std::endl;
+        logFile.close();
+    }
     t_start = std::chrono::steady_clock::now();
     for (Section &section : sections)
     {
@@ -100,34 +120,34 @@ void Section::compile_section()
 void Section::handle_logging(std::ofstream &logFile, size_t ms_passed, std::chrono::time_point<std::chrono::steady_clock> &t_last_log)
 {
     logFile.open(timeline->logFilePath, std::ios::app);
-    logFile << ftos(static_cast<float>(ms_passed) / 1000, 2) << "\t\t";
+    logFile << ftos(static_cast<float>(ms_passed) / 1000, 2) << "\t";
     timeline->logData.time.push_back(static_cast<float>(ms_passed) / 1000);
     if (timeline->logSpeed)
     {
         timeline->rct->send_signal("IN_PV_4");
         std::string response = timeline->rct->get_response();
-        logFile << response << "\t\t";
+        logFile << response << "\t";
         timeline->logData.speed.push_back(std::stof(response));
     }
     if (timeline->logTemperaturePlate)
     {
         timeline->rct->send_signal("IN_PV_2");
         std::string response = timeline->rct->get_response();
-        logFile << response << "\t\t";
+        logFile << response << "\t";
         timeline->logData.temperaturePlate.push_back(std::stof(response));
     }
     if (timeline->logTemperatureSensor)
     {
         timeline->rct->send_signal("IN_PV_1");
         std::string response = timeline->rct->get_response();
-        logFile << response << "\t\t";
+        logFile << response << "\t";
         timeline->logData.temperatureSensor.push_back(std::stof(response));
     }
     if (timeline->logViscosity)
     {
         timeline->rct->send_signal("IN_PV_5");
         std::string response = timeline->rct->get_response();
-        logFile << response << "\t\t";
+        logFile << response << "\t";
         timeline->logData.viscosity.push_back(std::stof(response));
     }
     logFile << std::endl;
@@ -179,22 +199,22 @@ void Section::execute_section()
     {
         logFile << std::endl
                 << "LOGDATA" << std::endl;
-        logFile << "Time\t\t";
+        logFile << "Time\t";
         if (timeline->logSpeed)
         {
-            logFile << "Speed\t\t";
+            logFile << "Speed\t";
         }
         if (timeline->logTemperaturePlate)
         {
-            logFile << "T Plate\t\t";
+            logFile << "T Plate\t";
         }
         if (timeline->logTemperatureSensor)
         {
-            logFile << "T Sensor\t\t";
+            logFile << "T Sensor\t";
         }
         if (timeline->logViscosity)
         {
-            logFile << "Viscosity\t\t";
+            logFile << "Viscosity\t";
         }
         logFile << std::endl;
         logFile.close();
@@ -212,7 +232,7 @@ void Section::execute_section()
     size_t ms_passed_section = 0;
     size_t step = 0;
 
-    while (ms_passed_section < ms_duration && !timeline->b_stop || step < temperatures.size())
+    while ((ms_passed_section < ms_duration || step < temperatures.size()) && !timeline->b_stop)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
         t_now = std::chrono::steady_clock::now();
@@ -233,15 +253,16 @@ void Section::execute_section()
             handle_logging(logFile, ms_passed, t_last_log);
         }
     }
+    
     if (!timeline->b_stop)
     {
-
         if (postSectionCommands.size() > 0)
         {
             if (b_log)
             {
                 logFile.open(timeline->logFilePath, std::ios::app);
-                logFile << "Post-section commands:" << std::endl;
+                logFile << std::endl
+                        << "Post-section commands:" << std::endl;
             }
             for (const std::string &command : postSectionCommands)
             {
@@ -251,16 +272,23 @@ void Section::execute_section()
                     logFile << command << "\t" << timeline->rct->get_response() << std::endl;
                 }
             }
+            if (b_log)
+            {
+                logFile.close();
+            }
         }
-        if (b_beep)
+        if (b_beep && wait_user && !wait_value)
         {
             sound_beep();
         }
         if ((wait_user || wait_value) && !timeline->b_stop)
         {
             timeline->waiting = true;
+            static bool adjustment_flag = true;
             while (timeline->waiting)
             {
+                t_now = std::chrono::steady_clock::now();
+                ms_passed = std::chrono::duration_cast<std::chrono::milliseconds>(t_now - timeline->t_start).count();
                 ms_passed_log = std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_last_log).count();
                 if (b_log && ms_passed_log >= logInterval_ms)
                 {
@@ -295,15 +323,25 @@ void Section::execute_section()
                         {
                             timeline->waiting = false;
                         }
+                        if (adjustment_flag)
+                        {
+                            sound_beep();
+                            adjustment_flag = false;
+                        }
                     }
                 }
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 duration += 0.1;
             }
         }
+        if (b_beep && !wait_user && !timeline->b_stop && !wait_value)
+        {
+            sound_beep();
+        }
     }
-    if (logFile.is_open())
+    if (b_log)
     {
+        logFile.open(timeline->logFilePath, std::ios::app);
         logFile << std::endl
                 << std::endl;
         logFile.close();
