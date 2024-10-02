@@ -295,56 +295,62 @@ void Beeper::super_mario_level_theme(float speed)
     setVolume(1.0);
     play();
 
-    play_note(e4, i4p, false, speed);
-    play_note(b3, i4p, false, speed);
-    play_note(gis2, i4, false, speed);
-    play_pause(i8);
-    play_note(cis4, i4, false, speed);
-    play_note(dis4, i4, false, speed);
-    play_note(d4, i8, false, speed);
-    play_note(cis4, i4, false, speed);
+    // Repeat 2x
+    for (int i = 0; i < 2; i++)
+    {
 
-    play_note(b3, i8, false, speed);
-    play_note(b3, i32, false, speed);
-    play_note(gis4, i8, false, speed);
-    play_note(gis4, i32, false, speed);
-    play_note(b4, i8, false, speed);
-    play_note(b4, i32, false, speed);
-    
-    play_note(cis6, i4, false, speed);
-    play_note(a4, i8, false, speed);
-    play_note(b4, i8, false, speed);
-    play_pause(i8);
+        play_note(g4, i4p, false, speed);
+        play_note(d3, i4p, false, speed);
+        play_note(b2, i4, false, speed);
+        play_pause(i8);
+        play_note(e4, i4, false, speed);
+        play_note(fis4, i4, false, speed);
+        play_note(f4, i8, false, speed);
+        play_note(e4, i4, false, speed);
 
-    play_note(gis4, i4, false, speed);
-    play_note(e4, i8, false, speed);
-    play_note(fis4, i8, false, speed);
-    play_note(dis4, i4p, false, speed);
+        play_note(d4, i8, false, speed);
+        play_note(d4, i32, false, speed);
+        play_note(b4, i8, false, speed);
+        play_note(b4, i32, false, speed);
+        play_note(d4, i8, false, speed);
+        play_note(d4, i32, false, speed);
 
-    play_note(e4, i4p, false, speed);
-    play_note(b3, i4p, false, speed);
-    play_note(gis2, i4, false, speed);
-    play_pause(i8);
-    play_note(cis4, i4, false, speed);
-    play_note(dis4, i4, false, speed);
-    play_note(d4, i8, false, speed);
-    play_note(cis4, i4, false, speed);
+        play_note(e5, i4, false, speed);
+        play_note(c4, i8, false, speed);
+        play_note(d4, i8, false, speed);
+        play_pause(i8);
 
-    play_note(b3, i8, false, speed);
-    play_note(b3, i32, false, speed);
-    play_note(gis4, i8, false, speed);
-    play_note(gis4, i32, false, speed);
-    play_note(b4, i8, false, speed);
-    play_note(b4, i32, false, speed);
-    play_note(cis6, i4, false, speed);
-    play_note(a4, i8, false, speed);
-    play_note(b4, i8, false, speed);
-    play_pause(i8);
-    play_note(gis4, i4, false, speed);
-    play_note(e4, i8, false, speed);
-    play_note(fis4, i8, false, speed);
-    play_note(dis4, i4p, false, speed);
-    
+        play_note(b4, i4, false, speed);
+        play_note(g4, i8, false, speed);
+        play_note(a5, i8, false, speed);
+        play_note(fis4, i4p, false, speed);
+    }
+    // repeat
+    // play_note(g4, i4p, false, speed);
+    // play_note(d3, i4p, false, speed);
+    // play_note(b2, i4, false, speed);
+    // play_pause(i8);
+    // play_note(e4, i4, false, speed);
+    // play_note(fis4, i4, false, speed);
+    // play_note(f4, i8, false, speed);
+    // play_note(e4, i4, false, speed);
+
+    // play_note(d4, i8, false, speed);
+    // play_note(d4, i32, false, speed);
+    // play_note(b4, i8, false, speed);
+    // play_note(b4, i32, false, speed);
+    // play_note(d4, i8, false, speed);
+    // play_note(d4, i32, false, speed);
+
+    // play_note(e5, i4, false, speed);
+    // play_note(c4, i8, false, speed);
+    // play_note(d4, i8, false, speed);
+    // play_pause(i8);
+    // play_note(b4, i4, false, speed);
+    // play_note(g4, i8, false, speed);
+    // play_note(e4, i8, false, speed);
+    // play_note(fis4, i4p, false, speed);
+
     stop();
     close();
 }
