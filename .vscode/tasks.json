@@ -11,6 +11,36 @@
                 "kind": "build",
                 "isDefault": true
             }
+        },
+        {
+            "type": "shell",
+            "label": "CMake: configure release",
+            "command": "cmake",
+            "args": [
+                "-DCMAKE_BUILD_TYPE=Release",
+                "-S",
+                "${workspaceFolder}",
+                "-B",
+                "${workspaceFolder}/build/Release"
+            ],
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "CMake configure task"
+        },
+        {
+           "type": "shell",
+            "label": "CMake: configure debug",
+            "command": "cmake",
+            "args": [
+                "-DCMAKE_BUILD_TYPE=Debug",
+                "-S",
+                "${workspaceFolder}",
+                "-B",
+                "${workspaceFolder}/build/Debug"
+            ],
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "CMake configure task" 
         }
     ],
     "version": "2.0.0"
