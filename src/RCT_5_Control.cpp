@@ -491,10 +491,11 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer*
         connectPort();
         get_device_name();
     }
-
+    // Temporary fix for weird msvc issue
+    #if defined(__GNUC__)
     fileDialog.SetCurrentDirectory(".");
     fileDialogLoad.SetCurrentDirectory(".");
-
+    #endif
     while (!done)
 
     {
