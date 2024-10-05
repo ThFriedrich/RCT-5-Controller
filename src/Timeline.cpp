@@ -1,5 +1,6 @@
 #include "TimeLine.h"
 #include "beeper.h"
+#include <cmath>
 
 void LogData::addData(float t, float tp, float ts, float s, float v)
 {
