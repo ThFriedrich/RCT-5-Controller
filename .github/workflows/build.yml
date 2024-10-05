@@ -1,0 +1,71 @@
+# Copyright (C) 2021 Thomas Friedrich, Chu-Ping Yu,
+# University of Antwerp - All Rights Reserved.
+# You may use, distribute and modify
+# this code under the terms of the GPL3 license.
+# You should have received a copy of the GPL3 license with
+# this file. If not, please visit:
+# https://www.gnu.org/licenses/gpl-3.0.en.html
+
+# Authors:
+#   Thomas Friedrich <thomas.friedrich@uantwerpen.be>
+#   Chu-Ping Yu <chu-ping.yu@uantwerpen.be>
+
+name: Compile
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  build_win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64_x86
+
+      - name: get sdl
+        run: |
+          curl.exe http://www.libsdl.org/release/SDL2-devel-2.0.16-VC.zip --output sdl.zip
+          tar -xf sdl.zip
+          ren SDL2-2.0.16 SDL2_VC
+          move SDL2_VC C:\
+          del sdl.zip
+
+      - name: Build with MSVC
+        run: |
+          mkdir build
+          cd build
+          cmake ..
+          msbuild .\RCT_5_Control.vcxproj /p:configuration=Release
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: Release_Win
+          path: |
+            build\Release
+
+  build_Linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Get SDL2, fftw3 and gcc-11
+        run: |
+          sudo apt-get update
+          sudo apt-get install libsdl2-dev libsdl2-image-dev libfftw3-dev gcc-11 g++-11
+      - name: Build
+        env:
+          CC: gcc-11
+          CXX: g++-11
+        run: |
+          cmake . -D CMAKE_BUILD_TYPE=Release
+          make
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: Release_Linux
+          path: |
+            RICOM

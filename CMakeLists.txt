@@ -1,16 +1,3 @@
-# Copyright (C) 2021 Thomas Friedrich, Chu-Ping Yu, 
-# University of Antwerp - All Rights Reserved. 
-# You may use, distribute and modify
-# this code under the terms of the GPL3 license.
-# You should have received a copy of the GPL3 license with
-# this file. If not, please visit: 
-# https://www.gnu.org/licenses/gpl-3.0.en.html
-# 
-# Authors: 
-#   Thomas Friedrich <thomas.friedrich@uantwerpen.be>
-#   Chu-Ping Yu <chu-ping.yu@uantwerpen.be>
-# 
-
 cmake_minimum_required(VERSION 3.16.0)
 
 project(RCT_5_Control LANGUAGES C CXX)
@@ -25,7 +12,6 @@ message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 if (UNIX)
     set(SDL2_INCLUDE_DIR /usr/include/SDL2)
-    set(FFTW3_DIR /usr/include)
     set(CMAKE_CXX_FLAGS "-Wall -Wextra -pthread")
     set(CMAKE_CXX_FLAGS_DEBUG "-g")
     set(CMAKE_CXX_FLAGS_RELEASE "-O2")
@@ -37,11 +23,9 @@ endif(UNIX)
 if (WIN32)
     set(SDL2_INCLUDE_DIR C:/SDL2_VC/include/)
     set(SDL2_LIB_DIR C:/SDL2_VC/lib/x64)
-    set(FFTW3_DIR C:/FFTW)
     set(BUILD_DIR ${PROJECT_BINARY_DIR}/${CMAKE_BUILD_TYPE})
     MESSAGE(STATUS ${PROJECT_BINARY_DIR}/${CMAKE_BUILD_TYPE})
     link_directories(${SDL2_LIB_DIR})
-    link_directories(${FFTW3_DIR})
 
     if (${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
         set(CMAKE_CXX_FLAGS "-Wall -Wextra -pthread -std=c++17")
@@ -57,8 +41,8 @@ if (WIN32)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /O2")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MT")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Qpar")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /favor:INTEL64")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
+        # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /favor:INTEL64")
+        # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /arch:AVX2")
     endif()
 
     file(COPY ${SDL2_LIB_DIR}/SDL2.dll DESTINATION ${BUILD_DIR})
@@ -97,8 +81,4 @@ target_include_directories( RCT_5_Control PUBLIC
     src
     )
 
-if (WIN32)
-    target_link_libraries(RCT_5_Control PUBLIC SDL2main SDL2 ${CMAKE_DL_LIBS})
-else ()
-    target_link_libraries(RCT_5_Control PUBLIC SDL2main SDL2 ${CMAKE_DL_LIBS})
-endif (WIN32)
+target_link_libraries(RCT_5_Control PUBLIC SDL2main SDL2 ${CMAKE_DL_LIBS})
