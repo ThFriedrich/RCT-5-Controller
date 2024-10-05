@@ -18,7 +18,7 @@ jobs:
   build_win:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - uses: ilammy/msvc-dev-cmd@v1
@@ -40,7 +40,7 @@ jobs:
           cmake ..
           msbuild .\RCT_5_Control.vcxproj /p:configuration=Release
       - name: Archive production artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: Release_Win
           path: |
