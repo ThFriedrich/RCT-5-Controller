@@ -23,7 +23,7 @@ class RCT_5_Control
 public:
     RCT_5_Control();
     // ~RCT_5_Control();
-    void render_window(SDL_Window *window,ImGuiIO &io, SDL_Renderer* renderer);
+    int render_window(SDL_Window *window,ImGuiIO &io, SDL_Renderer* renderer);
     void send_signal(const std::string &command);
     std::string get_response();
     float get_numeric_value();
@@ -49,7 +49,7 @@ private:
     void show_timeline_ui(TimeLine &timeline, ImGuiIO &io);
     void show_section_ui(Section &section, ImGuiIO &io);
     std::vector<TimeLine> timelines;
-    void save_timeline_ui(TimeLine &timeline);
+    void inline save_timeline_ui(TimeLine &timeline);
     
 };
 #endif // RCT_5_CONTROL_H

@@ -36,12 +36,12 @@ void Section::sound_beep()
 {
     if (timeline->current_section == timeline->sections.size() - 1)
     {
-        std::thread t1 = std::thread(Beeper::super_mario_level_finshed, 0.75);
+        auto t1 = std::thread(Beeper::super_mario_level_finshed, 0.75f);
         t1.detach();
     }
     else
     {
-        std::thread t1 = std::thread(Beeper::super_mario_level_theme, 1.0);
+        auto t1 = std::thread(Beeper::super_mario_level_theme, 1.0f);
         t1.detach();
     }
 }

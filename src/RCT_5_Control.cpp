@@ -462,8 +462,9 @@ void RCT_5_Control::save_timeline_ui(TimeLine &timeline)
         FileOperations::saveTimeLine(timeline, file_path);
     }
 }
-void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer* renderer)
+int RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer *renderer)
 {
+
     // Main loop
     bool done = false;
     const ImGuiViewport *viewport = ImGui::GetMainViewport();
@@ -491,11 +492,11 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer*
         connectPort();
         get_device_name();
     }
-    // Temporary fix for weird msvc issue
-    #if defined(__GNUC__)
+// Temporary fix for weird msvc issue
+#if defined(__GNUC__)
     fileDialog.SetCurrentDirectory(".");
     fileDialogLoad.SetCurrentDirectory(".");
-    #endif
+#endif
     while (!done)
 
     {
@@ -704,6 +705,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer*
                     }
                     ImGui::EndChild();
                     ImGui::NextColumn();
+                    ImGui::BeginChild("Script Editor Details", ImVec2(-1, -1), ImGuiChildFlags_None);
                     if ((int)timelines.size() > index_tl && index_tl >= 0)
                     {
                         if (!last_click_section)
@@ -716,6 +718,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer*
                             show_section_ui(timelines[index_tl].sections[index_sec], io);
                         }
                     }
+                    ImGui::EndChild();
                     ImGui::EndColumns();
                 }
 
@@ -723,7 +726,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer*
             }
             if (ImGui::BeginTabItem("Script Runner", NULL, ImGuiTabItemFlags_None))
             {
-
+                ImGui::BeginChild("Script Runner", ImVec2(-1, -1), ImGuiWindowFlags_None);
                 if (connected && rct_detected)
                 {
                     draw_circle('g', "RCT 5 Connected");
@@ -901,10 +904,12 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer*
                         }
                     }
                 }
+                ImGui::EndChild();
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Direct Interface", NULL, ImGuiTabItemFlags_None))
             {
+                ImGui::BeginChild("Direct Interface", ImVec2(-1, -1), ImGuiWindowFlags_None);
                 if (connected && rct_detected)
                 {
                     draw_circle('g', "RCT 5 Connected");
@@ -950,6 +955,7 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer*
                 }
                 // Response text box
                 ImGui::InputText("Response", &namur.responseText, ImGuiInputTextFlags_ReadOnly);
+                ImGui::EndChild();
                 ImGui::EndTabItem();
             }
         }
@@ -963,7 +969,6 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer*
         SDL_RenderClear(renderer);
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
         SDL_RenderPresent(renderer);
-
     }
 
     // Cleanup
@@ -979,4 +984,6 @@ void RCT_5_Control::render_window(SDL_Window *window, ImGuiIO &io, SDL_Renderer*
 
     // Save INI file settings
     ini_file.write(ini_cfg);
+
+    return 0;
 }
