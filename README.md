@@ -35,3 +35,5 @@ Control software with GUI for the "IKA RCT 5 digital" magnetic stirrer/heating p
   - wait for user option will execute the section and proceed with the next section after user confirmation (e.g. after a reactant has been added)
   - wait for value option will wait until all set values are reached before moving on to the next section (e.g. heating up to a specified temperature before adding a reactant)
   - Load the file ["Program_Example.tml"](Program_Example.tml) to see a simple 2 step example
+
+![grafik](https://github.com/user-attachments/assets/37da5e00-0921-4afb-a117-61b735db6c4a)
