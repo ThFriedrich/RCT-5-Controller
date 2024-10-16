@@ -25,15 +25,15 @@ Control software with GUI for the "IKA RCT 5 digital" magnetic stirrer/heating p
 ### Connection
  - Connect the RCT 5 digital via USB
  - Under the "Connection" menu select the correct port and Connect
- - Proper connection will be indicated and through the "direct interface" ut should be possible to communicate with the device. You may select any command from the dropdown menu to, which are all the commands known to the device.
+ - Proper connection will be indicated and through the "direct interface". You then may select any command from the dropdown menu, which are all the commands known to the device.
 
 ### Setting up Procedures
  - You can create, save and load procedures for execution
  - Each procedure may consist of multiple steps which can be set up individually with given start- and end temperatures and stirring speeds
  - different start and end values imply a linear ramp over the duration of the step
   - pre- and post-section commands may be specified for every section (e.g. setting controller mode, resetting the device)
-  - wait for user option will execute the section and proceed with the next section after user confirmation (e.g. after a reactant has been added)
-  - wait for value option will wait until all set values are reached before moving on to the next section (e.g. heating up to a specified temperature before adding a reactant)
+  - "wait for user" option will execute the section and proceed with the next section after user confirmation (e.g. after a reactant has been added)
+  - "wait for value" option will wait until all set values are reached before moving on to the next section (e.g. heating up to a specified temperature before adding a reactant)
   - Load the file ["Program_Example.tml"](Program_Example.tml) to see a simple 2 step example
 
 ![grafik](https://github.com/user-attachments/assets/37da5e00-0921-4afb-a117-61b735db6c4a)
